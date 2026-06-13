@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
 <meta name="theme-color" content="#0c160e"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -621,6 +621,325 @@ const POS_ABBR = {
   "内野手":"内","外野手":"外"
 };
 const abbrPos = (pos) => POS_ABBR[pos] || pos;
+/* ============================================================
+   LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
+   グローバルスコープに定義（ZONES等の定数を利用）
+   ============================================================ */
+const LiveFieldComponent = (function(){
+  const R = React;
+
+  // Canvas論理サイズ
+  const CW=500, CH=430;
+  const cx=250, cy=310;
+  const HOME={x:cx,y:cy-5};
+  // 塁座標 0=本 1=一 2=二 3=三
+  const BASE=[{x:cx,y:cy-5},{x:cx+40.5,y:cy-40.5},{x:cx,y:cy-81},{x:cx-40.5,y:cy-40.5}];
+
+  // ZONES(守備位置, 200x200系)をCanvas座標へマップ
+  // 元ZONES: cx基準100, cy上方向。各posの相対をCanvasへスケール
+  const POS_XY = {
+    P:{x:cx,        y:cy-48},
+    投:{x:cx,       y:cy-48},
+    C:{x:cx,        y:cy+14},
+    捕:{x:cx,       y:cy+14},
+    "1B":{x:cx+58,  y:cy-52}, 一:{x:cx+58, y:cy-52},
+    "2B":{x:cx+34,  y:cy-78}, 二:{x:cx+34, y:cy-78},
+    SS:{x:cx-34,    y:cy-78}, 遊:{x:cx-34, y:cy-78},
+    "3B":{x:cx-58,  y:cy-52}, 三:{x:cx-58, y:cy-52},
+    LF:{x:cx-118,   y:cy-150}, 左:{x:cx-118,y:cy-150},
+    CF:{x:cx,       y:cy-178}, 中:{x:cx,    y:cy-178},
+    RF:{x:cx+118,   y:cy-150}, 右:{x:cx+118,y:cy-150},
+  };
+  // ホームラン着弾点(各方向)
+  const HR_XY = {
+    LF:{x:cx-150,y:cy-185}, 左:{x:cx-150,y:cy-185},
+    CF:{x:cx,    y:cy-205}, 中:{x:cx,    y:cy-205},
+    RF:{x:cx+150,y:cy-185}, 右:{x:cx+150,y:cy-185},
+    _def:{x:cx,y:cy-205},
+  };
+
+  // フィールド静止画をオフスクリーンに一度だけ描画
+  let fieldCache=null;
+  function buildField(){
+    if(fieldCache) return fieldCache;
+    const oc=document.createElement('canvas'); oc.width=CW; oc.height=CH;
+    const c=oc.getContext('2d');
+    const brownExp=Math.atan(10/95);
+    c.save();c.beginPath();c.rect(0,0,CW,cy+7);c.clip();
+    const fR=230,fvx=cx,fvy=cy+51,fcr=20;
+    const flx=fvx+fR*Math.cos(Math.PI*1.25),fly=fvy+fR*Math.sin(Math.PI*1.25);
+    const frx=fvx+fR*Math.cos(Math.PI*1.75),fry=fvy+fR*Math.sin(Math.PI*1.75);
+    c.beginPath();c.moveTo(fvx,fvy);
+    c.arcTo(flx,fly,flx+100,fly-100,fcr);
+    c.arc(fvx,fvy,fR,Math.PI*1.25+fcr/fR,Math.PI*1.75-fcr/fR);
+    c.arcTo(frx,fry,fvx,fvy,fcr);
+    c.closePath();c.fillStyle="#6DBA23";c.fill();c.restore();
+    c.beginPath();c.moveTo(cx,cy+7);
+    c.arc(cx,cy+7,95,Math.PI*1.25-brownExp,Math.PI*1.75+brownExp);
+    c.closePath();c.fillStyle="#E5AF67";c.fill();
+    c.beginPath();c.arc(cx,cy-2,42,0,Math.PI*2);c.fillStyle="#E5AF67";c.fill();
+    (function(){
+      const rA=Math.PI*1.75+brownExp,lA=Math.PI*1.25-brownExp;
+      const rc={x:cx+95*Math.cos(rA),y:cy+7+95*Math.sin(rA)};
+      const lc={x:cx+95*Math.cos(lA),y:cy+7+95*Math.sin(lA)};
+      function hit(px,py,dx,dy){const ax=px-cx,ay=py-(cy-2);const b=ax*dx+ay*dy,cc=ax*ax+ay*ay-42*42;const sq=Math.sqrt(b*b-cc);const t1=-b-sq,t2=-b+sq;const t=t1>=0?t1:t2;return{x:px+dx*t,y:py+dy*t};}
+      const rFE=hit(cx,cy+7,Math.cos(rA),Math.sin(rA));
+      const lFE=hit(cx,cy+7,Math.cos(lA),Math.sin(lA));
+      const rPH=hit(rc.x,rc.y,-Math.cos(Math.PI*1.75),-Math.sin(Math.PI*1.75));
+      const lPH=hit(lc.x,lc.y,-Math.cos(Math.PI*1.25),-Math.sin(Math.PI*1.25));
+      const rFA=Math.atan2(rFE.y-(cy-2),rFE.x-cx),rPA=Math.atan2(rPH.y-(cy-2),rPH.x-cx);
+      const lFA=Math.atan2(lFE.y-(cy-2),lFE.x-cx),lPA=Math.atan2(lPH.y-(cy-2),lPH.x-cx);
+      c.fillStyle="#E5AF67";
+      c.beginPath();c.moveTo(rc.x,rc.y);c.lineTo(rFE.x,rFE.y);c.arc(cx,cy-2,42,rFA,rPA,false);c.closePath();c.fill();
+      c.beginPath();c.moveTo(lc.x,lc.y);c.lineTo(lFE.x,lFE.y);c.arc(cx,cy-2,42,lFA,lPA,true);c.closePath();c.fill();
+    })();
+    c.fillStyle="#E5AF67";
+    c.beginPath();c.moveTo(cx,cy+7);c.lineTo(cx+22,cy-9);c.lineTo(cx+22,cy+9);c.closePath();c.fill();
+    c.beginPath();c.moveTo(cx,cy+7);c.lineTo(cx-22,cy-9);c.lineTo(cx-22,cy+9);c.closePath();c.fill();
+    function fanArcHit(dx,dy){const ay=-44;const b=ay*dy,cc=ay*ay-230*230;const t=-b+Math.sqrt(b*b-cc);return{x:cx+dx*t,y:(cy+7)+dy*t};}
+    const fRf=fanArcHit(Math.cos(Math.PI*1.75),Math.sin(Math.PI*1.75));
+    const fLf=fanArcHit(Math.cos(Math.PI*1.25),Math.sin(Math.PI*1.25));
+    c.strokeStyle="#fff";c.lineWidth=3;
+    c.beginPath();c.moveTo(fRf.x,fRf.y);c.lineTo((cx+(cy+7))-(cy-9),cy-9);c.stroke();
+    c.beginPath();c.moveTo(fLf.x,fLf.y);c.lineTo((cy-9)-((cy+7)-cx),cy-9);c.stroke();
+    const r=38;
+    const fB={x:cx+r+2.5,y:cy-r-2.5},sB={x:cx,y:cy-r*2-5},tB={x:cx-r-2.5,y:cy-r-2.5};
+    function dB(x,y){c.save();c.translate(x,y);c.rotate(Math.PI/4);c.fillStyle="#fff";c.fillRect(-5,-5,10,10);c.restore();}
+    dB(fB.x,fB.y);dB(sB.x,sB.y);dB(tB.x,tB.y);
+    c.beginPath();c.moveTo(cx-7,cy-8);c.lineTo(cx+7,cy-8);c.lineTo(cx+7,cy);c.lineTo(cx,cy+7);c.lineTo(cx-7,cy);c.closePath();c.fillStyle="#fff";c.fill();
+    c.beginPath();c.arc(cx,cy-r-5,8,0,Math.PI*2);c.fillStyle="#A0522D";c.fill();
+    fieldCache=oc;
+    return oc;
+  }
+
+  // プレー分類
+  const ANIM_HIT = new Set(["H1","H2","H3","HR"]);
+  const ANIM_OUT_DIR = new Set(["GO","FO","LO","FF"]); // 方向ありアウト
+  const TEXT_ONLY = new Set(["DP","TP","FC","E","SAC","SF","OI","DI","OBI"]); // テキスト表示
+  const dirLabel = {P:"投",C:"捕","1B":"一","2B":"二",SS:"遊","3B":"三",LF:"左",CF:"中",RF:"右",
+                    投:"投",捕:"捕",一:"一",二:"二",三:"三",遊:"遊",左:"左",中:"中",右:"右"};
+  const codeJa = {H1:"ヒット",H2:"二塁打",H3:"三塁打",HR:"ホームラン",BB:"フォアボール",HBP:"デッドボール",
+    IBB:"敬遠",K:"三振",KL:"見逃し三振",GO:"ゴロ",FO:"フライ",LO:"ライナー",FF:"ファウルフライ",
+    DP:"ゲッツー",TP:"トリプルプレー",FC:"フィールダースチョイス",E:"エラー",SAC:"犠打",SF:"犠飛",
+    KW:"振り逃げ",OI:"守備妨害",DI:"守備妨害",OBI:"走塁妨害"};
+
+  function Comp(props){
+    const game = props.game||{};
+    const canvasRef = R.useRef(null);
+    const stateRef = R.useRef({
+      runners:[], ball:{x:HOME.x,y:HOME.y,vis:false,h:0}, effects:[], particles:[], raf:0
+    });
+    const lastSigRef = R.useRef(null);
+
+    // 守備位置→選手名マップ(守備側)
+    const half = game.half||"top";
+    const defSide = half==="top"?"home":"away";
+    const defLineup = game[defSide+"Lineup"]||[];
+    const posName = {};
+    defLineup.forEach(p=>{ if(p&&p.pos){ posName[abbrPos(p.pos)] = p.name; } });
+
+    // 現在の走者(bases)
+    const bases = game.bases||[null,null,null];
+
+    // 最新プレーの検出: log[0]
+    const log = game.log||[];
+    const latest = log[0]||null;
+
+    // 描画ループ
+    R.useEffect(()=>{
+      const cv=canvasRef.current; if(!cv) return;
+      const ctx=cv.getContext('2d');
+      const field=buildField();
+      const st=stateRef.current;
+
+      // 走者スプライトをbasesから同期(初期)
+      function syncRunnersFromBases(){
+        st.runners=[];
+        for(let i=0;i<3;i++){ if(bases[i]) st.runners.push({pos:i+1,name:bases[i],color:"#FFB300"}); }
+      }
+      if(st.runners.length===0) syncRunnersFromBases();
+
+      function basePos(p){
+        const i=Math.floor(p), f=p-i;
+        const a=BASE[i%4], b=BASE[(i+1)%4];
+        return {x:a.x+(b.x-a.x)*f, y:a.y+(b.y-a.y)*f};
+      }
+      function draw(){
+        ctx.clearRect(0,0,CW,CH);
+        ctx.drawImage(field,0,0);
+        // 守備選手名
+        ctx.font="600 9px -apple-system,sans-serif";
+        ctx.textAlign="center";
+        Object.keys(POS_XY).forEach(k=>{
+          if(k.length>2) return; // 日本語側スキップ(英略のみ描画)
+          const nm=posName[dirLabel[k]]||posName[k];
+          if(!nm) return;
+          const pt=POS_XY[k];
+          ctx.fillStyle="rgba(0,0,0,0.45)";
+          const w=ctx.measureText(nm).width+6;
+          ctx.fillRect(pt.x-w/2,pt.y-6,w,12);
+          ctx.fillStyle="#fff";
+          ctx.fillText(nm,pt.x,pt.y+3);
+        });
+        // 走者
+        st.runners.forEach(rn=>{
+          const p=basePos(Math.min(rn.pos,3.999));
+          ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);
+          ctx.fillStyle=rn.color;ctx.fill();
+          ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
+          if(rn.name){
+            ctx.font="700 8px -apple-system,sans-serif";ctx.fillStyle="#fff";
+            ctx.textAlign="center";
+            ctx.fillText(rn.name.slice(0,3),p.x,p.y-9);
+          }
+        });
+        // ボール
+        if(st.ball.vis){
+          ctx.beginPath();ctx.arc(st.ball.x,st.ball.y-st.ball.h,4,0,Math.PI*2);
+          ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#C62828";ctx.lineWidth=1;ctx.stroke();
+        }
+        // パーティクル
+        st.particles=st.particles.filter(pt=>{
+          pt.x+=pt.vx;pt.y+=pt.vy;pt.vy+=pt.g||0;pt.life--;
+          ctx.globalAlpha=Math.max(0,pt.life/pt.max);
+          ctx.beginPath();ctx.arc(pt.x,pt.y,pt.r,0,Math.PI*2);ctx.fillStyle=pt.c;ctx.fill();
+          ctx.globalAlpha=1; return pt.life>0;
+        });
+        // エフェクト(テキスト/スタンプ)
+        const now=performance.now();
+        st.effects=st.effects.filter(e=>{
+          const t=(now-e.t)/e.dur; if(t>=1) return false;
+          if(e.type==="txt"){
+            const sc=t<0.2?t/0.2:1, al=t>0.7?1-(t-0.7)/0.3:1;
+            ctx.save();ctx.globalAlpha=al;
+            ctx.font="900 "+(e.size*sc)+"px -apple-system,sans-serif";
+            ctx.textAlign="center";ctx.lineWidth=4;ctx.strokeStyle="#fff";
+            ctx.strokeText(e.txt,CW/2,e.y);ctx.fillStyle=e.color;ctx.fillText(e.txt,CW/2,e.y);
+            if(e.sub){ ctx.font="700 13px -apple-system,sans-serif";
+              ctx.lineWidth=3;ctx.strokeText(e.sub,CW/2,e.y+24);ctx.fillStyle="#1B3A1B";ctx.fillText(e.sub,CW/2,e.y+24);}
+            ctx.restore();
+          } else if(e.type==="stamp"){
+            const sc=t<0.15?2-(t/0.15):1, al=t>0.75?1-(t-0.75)/0.25:1;
+            ctx.save();ctx.globalAlpha=al;ctx.translate(e.x,e.y);ctx.scale(sc,sc);ctx.rotate(-0.12);
+            ctx.font="900 24px -apple-system,sans-serif";ctx.textAlign="center";
+            ctx.lineWidth=6;ctx.strokeStyle="#fff";ctx.strokeText(e.txt,0,0);
+            ctx.fillStyle=e.color;ctx.fillText(e.txt,0,0);ctx.restore();
+          }
+          return true;
+        });
+        st.raf=requestAnimationFrame(draw);
+      }
+      draw();
+      return ()=>cancelAnimationFrame(st.raf);
+    },[posName, bases.join(",")]);
+
+    // 最新プレーが変わったらアニメ
+    R.useEffect(()=>{
+      if(!latest) return;
+      const sig=(latest.ts||"")+"|"+(latest.msg||"");
+      if(lastSigRef.current===null){ lastSigRef.current=sig; return; } // 初回は再生しない
+      if(lastSigRef.current===sig) return;
+      lastSigRef.current=sig;
+      playLatest(latest);
+    },[latest&&latest.ts, latest&&latest.msg]);
+
+    // プレー再生
+    function playLatest(entry){
+      const st=stateRef.current;
+      // 最新打者のcode/dirを取得
+      const info = extractPlay(game);
+      const code = info.code;
+      const dir  = info.dir;
+      const runs = entry.runs||0;
+
+      function fxTxt(txt,color,size,y,sub){ st.effects.push({type:"txt",txt,color,size:size||30,y:y||150,sub,t:performance.now(),dur:1500}); }
+      function fxStamp(txt,x,y,color){ st.effects.push({type:"stamp",txt,x,y,color,t:performance.now(),dur:1200}); }
+      function firework(x,y){const cols=["#FFD54F","#EF5350","#42A5F5","#66BB6A","#FFA726"];for(let i=0;i<26;i++){const a=Math.PI*2*i/26;const sp=1.5+Math.random()*2;st.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:0.04,r:2,c:cols[i%5],life:46,max:46});}}
+      const wait=ms=>new Promise(r=>setTimeout(r,ms));
+      function tween(dur,fn){return new Promise(res=>{const t0=performance.now();function s(t){const p=Math.min(1,(t-t0)/dur);fn(p);if(p<1)requestAnimationFrame(s);else res();}requestAnimationFrame(s);});}
+      const easeOut=p=>1-Math.pow(1-p,2);
+      async function ballFly(to,dur,peak){st.ball.vis=true;const f={x:HOME.x,y:HOME.y};await tween(dur,p=>{st.ball.x=f.x+(to.x-f.x)*p;st.ball.y=f.y+(to.y-f.y)*p;st.ball.h=peak*Math.sin(Math.PI*p);});st.ball.h=0;}
+      async function ballGround(to,dur){st.ball.vis=true;const f={x:HOME.x,y:HOME.y};await tween(dur,p=>{const e=easeOut(p);st.ball.x=f.x+(to.x-f.x)*e;st.ball.y=f.y+(to.y-f.y)*e;st.ball.h=Math.abs(Math.sin(p*Math.PI*4))*4*(1-p);});st.ball.h=0;}
+
+      const tgt = POS_XY[dir]||POS_XY.CF;
+
+      // 振り分け
+      (async()=>{
+        if(code==="HR"){
+          const hp=HR_XY[dir]||HR_XY._def;
+          fxTxt("ホームラン！！","#C62828",36,140);
+          await ballFly(hp,800,55);
+          firework(hp.x,hp.y);firework(hp.x-28,hp.y+16);firework(hp.x+28,hp.y+16);
+          st.ball.vis=false; await wait(900);
+        } else if(ANIM_HIT.has(code)){
+          const jp=codeJa[code]||"ヒット";
+          fxTxt(jp+"！","#1565C0",32,140, dir?("打球方向："+(dirLabel[dir]||dir)):"");
+          await ballFly(tgt,640,30);
+          await wait(700);
+        } else if(code==="K"||code==="KL"){
+          fxTxt(code==="KL"?"見逃し三振！":"三振！","#C62828",36,150);
+          fxStamp("K",HOME.x+46,HOME.y-30,"#C62828");
+          await wait(900);
+        } else if(code==="BB"||code==="IBB"){
+          fxTxt(code==="IBB"?"敬遠":"フォアボール","#6A1B9A",30,150);
+          await wait(800);
+        } else if(code==="HBP"){
+          fxTxt("デッドボール","#6A1B9A",30,150);
+          await wait(800);
+        } else if(ANIM_OUT_DIR.has(code)){
+          const jp=codeJa[code]||"アウト";
+          fxTxt(jp,"#555",26,140, dir?("打球方向："+(dirLabel[dir]||dir)):"");
+          if(code==="FO"||code==="FF"){ await ballFly(tgt,720,44); }
+          else if(code==="LO"){ await ballFly(tgt,320,10); }
+          else { await ballGround(tgt,460); }
+          fxStamp("OUT",tgt.x,tgt.y-22,"#C62828");
+          await wait(700);
+        } else if(TEXT_ONLY.has(code)){
+          const jp=codeJa[code]||code;
+          fxTxt(jp,"#C62828",30,150, dir?("打球方向："+(dirLabel[dir]||dir)):"");
+          await wait(1100);
+        } else {
+          // その他(盗塁・進塁など)はログmsgから簡易表示
+          const jp = codeJa[code] || (entry.msg||"").replace(/【.*?】/,"").slice(0,12) || "プレー";
+          fxTxt(jp,"#EF6C00",26,150);
+          await wait(900);
+        }
+        // 走者を最新basesへ同期
+        st.runners=[];
+        const nb=game.bases||[null,null,null];
+        for(let i=0;i<3;i++){ if(nb[i]) st.runners.push({pos:i+1,name:nb[i],color:"#FFB300"}); }
+        if(runs>0) fxTxt("得点！","#C62828",28,190);
+        st.ball.vis=false;
+      })();
+    }
+
+    return R.createElement('div',{style:{width:"100%",maxWidth:480,margin:"0 auto"}}
+      , R.createElement('canvas',{ ref:canvasRef, width:CW, height:CH,
+          style:{width:"100%",display:"block",borderRadius:12,background:"#d4edbc"} })
+    );
+  }
+
+  // 最新打席のcode/dirを抽出
+  function extractPlay(game){
+    const half=game.half||"top";
+    // 直近で打席が記録されたのは攻撃側
+    const offSide = half==="top"?"away":"home";
+    const lineup = game[offSide+"Lineup"]||[];
+    let best=null, bestInn=-1;
+    lineup.forEach(p=>{
+      const ab=p.atBats||{};
+      Object.keys(ab).map(Number).forEach(inn=>{
+        const arr=Array.isArray(ab[inn])?ab[inn]:[ab[inn]];
+        arr.forEach(e=>{ if(e&&e.code){ if(inn>=bestInn){ bestInn=inn; best=e; } } });
+      });
+    });
+    // 全打者の最終打席のうち最大イニングの最後 → 近似的に最新
+    return { code: best?best.code:null, dir: best?best.dir:null };
+  }
+
+  return Comp;
+})();
+
 const makePlayer  = (i) => ({ id:i, name:`選手${i}`, pos:"", atBats:{}, rbi:0, sb:0, cs:0 });
 const makePitcher = (i) => ({ id:i, name:`投手${i}`, ip:0, h:0, er:0, bb:0, k:0,
   pitchCount:0, strikeCount:0, ballCount:0,
@@ -3157,16 +3476,16 @@ function App() {
       )
 
       
-      , React.createElement('nav', { style: S.nav,}
-        , React.createElement('div',{style:{textAlign:"right",fontSize:10,color:"#f97316",marginBottom:2,paddingRight:4,fontWeight:700}}, "v472")
+      , React.createElement('nav', { style: {...S.nav, position:"relative", padding:"0 4px", paddingTop: isReadOnly ? "calc(env(safe-area-inset-top, 0px) + 40px)" : undefined},}
+        , React.createElement('div',{style:{display:"flex",overflowX:"auto",flex:1,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}
         , tab!=="login" && (isReadOnly
           ? [["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
-                background:"transparent",border:"none",
+                background:tab===id?"#1a2a45":"transparent",border:"none",borderRadius:"8px 8px 0 0",
                 borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
                 color:tab===id?"#fb923c":"#7db8e8",
-                padding:"10px 12px",cursor:"pointer",fontSize:13,whiteSpace:"nowrap",
-                fontWeight:tab===id?800:400,
+                padding:"12px 10px",cursor:"pointer",fontSize:13,whiteSpace:"nowrap",
+                fontWeight:tab===id?800:500,
               },}, l)
             ))
           : [["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
@@ -3179,6 +3498,8 @@ function App() {
               },}, l)
             ))
         )
+        )
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.1")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3262,7 +3583,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.1")
         )
 
         // ===== 新規チーム作成 =====
@@ -3550,6 +3871,9 @@ function App() {
             const _showReturnLive = isReadOnly && window.__teamShareCode && window.__loadedFromHistory;
 
             return React.createElement('div',{style:{maxWidth:480,margin:"0 auto",display:"flex",flexDirection:"column",gap:8,paddingTop:8}}
+
+              // ▼ プレーアニメーション フィールド（閲覧モード速報）
+              , React.createElement(LiveFieldComponent, { game: g })
 
               // 「LIVEに戻る」ボタン（履歴を読み込んでいるとき表示）
               ,_showReturnLive && React.createElement('button',{
