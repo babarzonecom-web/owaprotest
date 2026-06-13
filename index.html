@@ -629,12 +629,16 @@ const abbrPos = (pos) => POS_ABBR[pos] || pos;
    LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
    グローバルスコープに定義（ZONES等の定数を利用）
    ============================================================ */
+/* ============================================================
+   LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
+   グローバルスコープに定義（ZONES等の定数を利用）
+   ============================================================ */
 const LiveFieldComponent = (function(){
   const R = React;
 
   // Canvas論理サイズ
-  const CW=500, CH=375;
-  const cx=250, cy=300;
+  const CW=500, CH=340;
+  const cx=250, cy=295;
   const HOME={x:cx,y:cy-5};
   // 塁座標 0=本 1=一 2=二 3=三
   const BASE=[{x:cx,y:cy-5},{x:cx+40.5,y:cy-40.5},{x:cx,y:cy-81},{x:cx-40.5,y:cy-40.5}];
@@ -772,7 +776,7 @@ const LiveFieldComponent = (function(){
         ctx.clearRect(0,0,CW,CH);
         ctx.drawImage(field,0,0);
         // 守備選手名
-        ctx.font="600 10px -apple-system,sans-serif";
+        ctx.font="700 13px -apple-system,sans-serif";
         ctx.textAlign="center";
         Object.keys(POS_XY).forEach(k=>{
           if(k.length>2) return; // 日本語側スキップ(英略のみ描画)
@@ -780,11 +784,11 @@ const LiveFieldComponent = (function(){
           if(!nm) return;
           const pt=POS_XY[k];
           const disp=nm.slice(0,4);
-          const w=ctx.measureText(disp).width+8;
-          ctx.fillStyle="rgba(8,15,30,0.72)";
-          ctx.fillRect(pt.x-w/2,pt.y-7,w,14);
+          const w=ctx.measureText(disp).width+10;
+          ctx.fillStyle="rgba(8,15,30,0.78)";
+          ctx.fillRect(pt.x-w/2,pt.y-9,w,18);
           ctx.fillStyle="#cfe8ff";
-          ctx.fillText(disp,pt.x,pt.y+3);
+          ctx.fillText(disp,pt.x,pt.y+4);
         });
         // 走者
         st.runners.forEach(rn=>{
@@ -795,19 +799,19 @@ const LiveFieldComponent = (function(){
           ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
           if(rn.name){
             // 塁別に名前を外側へ: 一塁=右, 二塁=上, 三塁=左
-            let nx=p.x, ny=p.y+14, ta="center";
-            if(bi===1){ nx=p.x+12; ny=p.y+3; ta="left"; }
-            else if(bi===2){ nx=p.x; ny=p.y-12; ta="center"; }
-            else if(bi===3){ nx=p.x-12; ny=p.y+3; ta="right"; }
+            let nx=p.x, ny=p.y+18, ta="center";
+            if(bi===1){ nx=p.x+14; ny=p.y+4; ta="left"; }
+            else if(bi===2){ nx=p.x; ny=p.y-14; ta="center"; }
+            else if(bi===3){ nx=p.x-14; ny=p.y+4; ta="right"; }
             const nm=rn.name.slice(0,4);
-            ctx.font="700 9px -apple-system,sans-serif";
+            ctx.font="800 12px -apple-system,sans-serif";
             ctx.textAlign=ta;
-            const w=ctx.measureText(nm).width+6;
-            const bx = ta==="left"?nx-3 : ta==="right"?nx-w+3 : nx-w/2;
-            ctx.fillStyle="rgba(255,179,0,0.85)";
-            ctx.fillRect(bx,ny-8,w,12);
+            const w=ctx.measureText(nm).width+8;
+            const bx = ta==="left"?nx-4 : ta==="right"?nx-w+4 : nx-w/2;
+            ctx.fillStyle="rgba(255,179,0,0.9)";
+            ctx.fillRect(bx,ny-10,w,17);
             ctx.fillStyle="#1a1000";
-            ctx.fillText(nm,nx,ny+1);
+            ctx.fillText(nm,nx,ny+2);
           }
         });
         // ボール
@@ -3545,7 +3549,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.2")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.3")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3629,7 +3633,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.2")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.3")
         )
 
         // ===== 新規チーム作成 =====
