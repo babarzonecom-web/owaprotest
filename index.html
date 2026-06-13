@@ -625,12 +625,16 @@ const abbrPos = (pos) => POS_ABBR[pos] || pos;
    LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
    グローバルスコープに定義（ZONES等の定数を利用）
    ============================================================ */
+/* ============================================================
+   LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
+   グローバルスコープに定義（ZONES等の定数を利用）
+   ============================================================ */
 const LiveFieldComponent = (function(){
   const R = React;
 
   // Canvas論理サイズ
-  const CW=500, CH=430;
-  const cx=250, cy=310;
+  const CW=500, CH=375;
+  const cx=250, cy=300;
   const HOME={x:cx,y:cy-5};
   // 塁座標 0=本 1=一 2=二 3=三
   const BASE=[{x:cx,y:cy-5},{x:cx+40.5,y:cy-40.5},{x:cx,y:cy-81},{x:cx-40.5,y:cy-40.5}];
@@ -646,9 +650,9 @@ const LiveFieldComponent = (function(){
     "2B":{x:cx+34,  y:cy-78}, 二:{x:cx+34, y:cy-78},
     SS:{x:cx-34,    y:cy-78}, 遊:{x:cx-34, y:cy-78},
     "3B":{x:cx-58,  y:cy-52}, 三:{x:cx-58, y:cy-52},
-    LF:{x:cx-118,   y:cy-150}, 左:{x:cx-118,y:cy-150},
-    CF:{x:cx,       y:cy-178}, 中:{x:cx,    y:cy-178},
-    RF:{x:cx+118,   y:cy-150}, 右:{x:cx+118,y:cy-150},
+    LF:{x:cx-118,   y:cy-110}, 左:{x:cx-118,y:cy-110},
+    CF:{x:cx,       y:cy-130}, 中:{x:cx,    y:cy-130},
+    RF:{x:cx+118,   y:cy-110}, 右:{x:cx+118,y:cy-110},
   };
   // ホームラン着弾点(各方向)
   const HR_XY = {
@@ -673,11 +677,11 @@ const LiveFieldComponent = (function(){
     c.arcTo(flx,fly,flx+100,fly-100,fcr);
     c.arc(fvx,fvy,fR,Math.PI*1.25+fcr/fR,Math.PI*1.75-fcr/fR);
     c.arcTo(frx,fry,fvx,fvy,fcr);
-    c.closePath();c.fillStyle="#6DBA23";c.fill();c.restore();
+    c.closePath();c.fillStyle="#3d7a3a";c.fill();c.restore();
     c.beginPath();c.moveTo(cx,cy+7);
     c.arc(cx,cy+7,95,Math.PI*1.25-brownExp,Math.PI*1.75+brownExp);
-    c.closePath();c.fillStyle="#E5AF67";c.fill();
-    c.beginPath();c.arc(cx,cy-2,42,0,Math.PI*2);c.fillStyle="#E5AF67";c.fill();
+    c.closePath();c.fillStyle="#9c7248";c.fill();
+    c.beginPath();c.arc(cx,cy-2,42,0,Math.PI*2);c.fillStyle="#9c7248";c.fill();
     (function(){
       const rA=Math.PI*1.75+brownExp,lA=Math.PI*1.25-brownExp;
       const rc={x:cx+95*Math.cos(rA),y:cy+7+95*Math.sin(rA)};
@@ -689,11 +693,11 @@ const LiveFieldComponent = (function(){
       const lPH=hit(lc.x,lc.y,-Math.cos(Math.PI*1.25),-Math.sin(Math.PI*1.25));
       const rFA=Math.atan2(rFE.y-(cy-2),rFE.x-cx),rPA=Math.atan2(rPH.y-(cy-2),rPH.x-cx);
       const lFA=Math.atan2(lFE.y-(cy-2),lFE.x-cx),lPA=Math.atan2(lPH.y-(cy-2),lPH.x-cx);
-      c.fillStyle="#E5AF67";
+      c.fillStyle="#9c7248";
       c.beginPath();c.moveTo(rc.x,rc.y);c.lineTo(rFE.x,rFE.y);c.arc(cx,cy-2,42,rFA,rPA,false);c.closePath();c.fill();
       c.beginPath();c.moveTo(lc.x,lc.y);c.lineTo(lFE.x,lFE.y);c.arc(cx,cy-2,42,lFA,lPA,true);c.closePath();c.fill();
     })();
-    c.fillStyle="#E5AF67";
+    c.fillStyle="#9c7248";
     c.beginPath();c.moveTo(cx,cy+7);c.lineTo(cx+22,cy-9);c.lineTo(cx+22,cy+9);c.closePath();c.fill();
     c.beginPath();c.moveTo(cx,cy+7);c.lineTo(cx-22,cy-9);c.lineTo(cx-22,cy+9);c.closePath();c.fill();
     function fanArcHit(dx,dy){const ay=-44;const b=ay*dy,cc=ay*ay-230*230;const t=-b+Math.sqrt(b*b-cc);return{x:cx+dx*t,y:(cy+7)+dy*t};}
@@ -707,7 +711,7 @@ const LiveFieldComponent = (function(){
     function dB(x,y){c.save();c.translate(x,y);c.rotate(Math.PI/4);c.fillStyle="#fff";c.fillRect(-5,-5,10,10);c.restore();}
     dB(fB.x,fB.y);dB(sB.x,sB.y);dB(tB.x,tB.y);
     c.beginPath();c.moveTo(cx-7,cy-8);c.lineTo(cx+7,cy-8);c.lineTo(cx+7,cy);c.lineTo(cx,cy+7);c.lineTo(cx-7,cy);c.closePath();c.fillStyle="#fff";c.fill();
-    c.beginPath();c.arc(cx,cy-r-5,8,0,Math.PI*2);c.fillStyle="#A0522D";c.fill();
+    c.beginPath();c.arc(cx,cy-r-5,8,0,Math.PI*2);c.fillStyle="#7a5535";c.fill();
     fieldCache=oc;
     return oc;
   }
@@ -768,29 +772,42 @@ const LiveFieldComponent = (function(){
         ctx.clearRect(0,0,CW,CH);
         ctx.drawImage(field,0,0);
         // 守備選手名
-        ctx.font="600 9px -apple-system,sans-serif";
+        ctx.font="600 10px -apple-system,sans-serif";
         ctx.textAlign="center";
         Object.keys(POS_XY).forEach(k=>{
           if(k.length>2) return; // 日本語側スキップ(英略のみ描画)
           const nm=posName[dirLabel[k]]||posName[k];
           if(!nm) return;
           const pt=POS_XY[k];
-          ctx.fillStyle="rgba(0,0,0,0.45)";
-          const w=ctx.measureText(nm).width+6;
-          ctx.fillRect(pt.x-w/2,pt.y-6,w,12);
-          ctx.fillStyle="#fff";
-          ctx.fillText(nm,pt.x,pt.y+3);
+          const disp=nm.slice(0,4);
+          const w=ctx.measureText(disp).width+8;
+          ctx.fillStyle="rgba(8,15,30,0.72)";
+          ctx.fillRect(pt.x-w/2,pt.y-7,w,14);
+          ctx.fillStyle="#cfe8ff";
+          ctx.fillText(disp,pt.x,pt.y+3);
         });
         // 走者
         st.runners.forEach(rn=>{
+          const bi=Math.round(rn.pos)%4;
           const p=basePos(Math.min(rn.pos,3.999));
           ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);
           ctx.fillStyle=rn.color;ctx.fill();
           ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
           if(rn.name){
-            ctx.font="700 8px -apple-system,sans-serif";ctx.fillStyle="#fff";
-            ctx.textAlign="center";
-            ctx.fillText(rn.name.slice(0,3),p.x,p.y-9);
+            // 塁別に名前を外側へ: 一塁=右, 二塁=上, 三塁=左
+            let nx=p.x, ny=p.y+14, ta="center";
+            if(bi===1){ nx=p.x+12; ny=p.y+3; ta="left"; }
+            else if(bi===2){ nx=p.x; ny=p.y-12; ta="center"; }
+            else if(bi===3){ nx=p.x-12; ny=p.y+3; ta="right"; }
+            const nm=rn.name.slice(0,4);
+            ctx.font="700 9px -apple-system,sans-serif";
+            ctx.textAlign=ta;
+            const w=ctx.measureText(nm).width+6;
+            const bx = ta==="left"?nx-3 : ta==="right"?nx-w+3 : nx-w/2;
+            ctx.fillStyle="rgba(255,179,0,0.85)";
+            ctx.fillRect(bx,ny-8,w,12);
+            ctx.fillStyle="#1a1000";
+            ctx.fillText(nm,nx,ny+1);
           }
         });
         // ボール
@@ -847,7 +864,7 @@ const LiveFieldComponent = (function(){
     function playLatest(entry){
       const st=stateRef.current;
       // 最新打者のcode/dirを取得
-      const info = extractPlay(game);
+      const info = extractPlay(game, entry);
       const code = info.code;
       const dir  = info.dir;
       const runs = entry.runs||0;
@@ -915,25 +932,54 @@ const LiveFieldComponent = (function(){
 
     return R.createElement('div',{style:{width:"100%",maxWidth:480,margin:"0 auto"}}
       , R.createElement('canvas',{ ref:canvasRef, width:CW, height:CH,
-          style:{width:"100%",display:"block",borderRadius:12,background:"#d4edbc"} })
+          style:{width:"100%",display:"block",borderRadius:12,background:"linear-gradient(135deg,#0d1f35,#0a1828)"} })
     );
   }
 
   // 最新打席のcode/dirを抽出
-  function extractPlay(game){
+  // 最新ログ(latest)を渡し、その打者名・イニングから正確に打席を特定
+  function extractPlay(game, latest){
     const half=game.half||"top";
-    // 直近で打席が記録されたのは攻撃側
     const offSide = half==="top"?"away":"home";
     const lineup = game[offSide+"Lineup"]||[];
+    const msg = (latest&&latest.msg)||"";
+
+    // msgから打者名を抽出: 【チーム】打者名 → 結果（N回）
+    let batterName=null, logInn=null;
+    const m = msg.match(/】\s*([^→\s]+)\s*→/);
+    if(m) batterName=m[1];
+    const im = msg.match(/（(\d+)回）/);
+    if(im) logInn=Number(im[1]);
+
+    // 打者名が取れたら、その打者の該当イニング打席を引く
+    if(batterName){
+      const p = lineup.find(pl=>pl && pl.name===batterName);
+      if(p && p.atBats){
+        if(logInn!=null && p.atBats[logInn]!=null){
+          const arr=Array.isArray(p.atBats[logInn])?p.atBats[logInn]:[p.atBats[logInn]];
+          const e=arr[arr.length-1];
+          if(e&&e.code) return {code:e.code, dir:e.dir};
+        }
+        // イニング不明 or 一致せず → その打者の最大イニング末尾
+        const inns=Object.keys(p.atBats).map(Number).sort((a,b)=>b-a);
+        for(const inn of inns){
+          const arr=Array.isArray(p.atBats[inn])?p.atBats[inn]:[p.atBats[inn]];
+          const e=arr[arr.length-1];
+          if(e&&e.code) return {code:e.code, dir:e.dir};
+        }
+      }
+    }
+
+    // フォールバック: 全打者の最大イニング末尾
     let best=null, bestInn=-1;
     lineup.forEach(p=>{
       const ab=p.atBats||{};
       Object.keys(ab).map(Number).forEach(inn=>{
         const arr=Array.isArray(ab[inn])?ab[inn]:[ab[inn]];
-        arr.forEach(e=>{ if(e&&e.code){ if(inn>=bestInn){ bestInn=inn; best=e; } } });
+        const e=arr[arr.length-1];
+        if(e&&e.code&&inn>=bestInn){ bestInn=inn; best=e; }
       });
     });
-    // 全打者の最終打席のうち最大イニングの最後 → 近似的に最新
     return { code: best?best.code:null, dir: best?best.dir:null };
   }
 
@@ -3499,7 +3545,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.1")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.2")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3583,7 +3629,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.1")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.2")
         )
 
         // ===== 新規チーム作成 =====
