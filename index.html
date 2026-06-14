@@ -637,6 +637,10 @@ const abbrPos = (pos) => POS_ABBR[pos] || pos;
    LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
    グローバルスコープに定義（ZONES等の定数を利用）
    ============================================================ */
+/* ============================================================
+   LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
+   グローバルスコープに定義（ZONES等の定数を利用）
+   ============================================================ */
 const LiveFieldComponent = (function(){
   const R = React;
 
@@ -750,9 +754,20 @@ const LiveFieldComponent = (function(){
     const defLineup = game[defSide+"Lineup"]||[];
     const posName = {};
     defLineup.forEach(p=>{ if(p&&p.pos){ posName[abbrPos(p.pos)] = p.name; } });
+    // 投手は専用データ(投手タブ/先発選択)を優先
+    const defPitchers = game[defSide+"Pitchers"]||[];
+    const defPIdx = game[defSide+"PitcherIdx"]||0;
+    const curPitcher = defPitchers[defPIdx];
+    if(curPitcher && curPitcher.name){ posName["投"]=curPitcher.name; posName["P"]=curPitcher.name; }
 
     // 現在の走者(bases)
     const bases = game.bases||[null,null,null];
+
+    // 現在の打者名(攻撃側のBatterIdx)
+    const offSide2 = half==="top"?"away":"home";
+    const offLineup = game[offSide2+"Lineup"]||[];
+    const batterIdx = game[offSide2+"BatterIdx"]||0;
+    const batterName = (offLineup[batterIdx]&&offLineup[batterIdx].name)||null;
 
     // 最新プレーの検出: log[0]
     const log = game.log||[];
@@ -821,6 +836,17 @@ const LiveFieldComponent = (function(){
             ctx.fillText(nm,nx,ny+2);
           }
         });
+        // 打者名(ホームベース下)
+        if(batterName){
+          const bn="打者 "+batterName.slice(0,5);
+          ctx.font="800 12px -apple-system,sans-serif";
+          ctx.textAlign="center";
+          const bw=ctx.measureText(bn).width+12;
+          ctx.fillStyle="rgba(245,158,11,0.95)";
+          ctx.fillRect(cx-bw/2, cy+22, bw, 18);
+          ctx.fillStyle="#1a1000";
+          ctx.fillText(bn, cx, cy+35);
+        }
         // ボール
         if(st.ball.vis){
           ctx.beginPath();ctx.arc(st.ball.x,st.ball.y-st.ball.h,4,0,Math.PI*2);
@@ -862,7 +888,7 @@ const LiveFieldComponent = (function(){
       }
       draw();
       return ()=>cancelAnimationFrame(st.raf);
-    },[posName, bases.join(",")]);
+    },[posName, bases.join(","), batterName]);
 
     // 最新プレーが変わったらアニメ
     R.useEffect(()=>{
@@ -883,8 +909,8 @@ const LiveFieldComponent = (function(){
       const dir  = info.dir;
       const runs = entry.runs||0;
 
-      function fxTxt(txt,color,size,y,sub){ st.effects.push({type:"txt",txt,color,size:size||30,y:y||110,sub,t:performance.now(),dur:1500}); }
-      function fxStamp(txt,x,y,color){ st.effects.push({type:"stamp",txt,x,y,color,t:performance.now(),dur:1200}); }
+      function fxTxt(txt,color,size,y,sub){ st.effects.push({type:"txt",txt,color,size:size||30,y:y||110,sub,t:performance.now(),dur:2000}); }
+      function fxStamp(txt,x,y,color){ st.effects.push({type:"stamp",txt,x,y,color,t:performance.now(),dur:1600}); }
       function firework(x,y){const cols=["#FFD54F","#EF5350","#42A5F5","#66BB6A","#FFA726"];for(let i=0;i<26;i++){const a=Math.PI*2*i/26;const sp=1.5+Math.random()*2;st.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:0.04,r:2,c:cols[i%5],life:46,max:46});}}
       const wait=ms=>new Promise(r=>setTimeout(r,ms));
       function tween(dur,fn){return new Promise(res=>{const t0=performance.now();function s(t){const p=Math.min(1,(t-t0)/dur);fn(p);if(p<1)requestAnimationFrame(s);else res();}requestAnimationFrame(s);});}
@@ -892,48 +918,58 @@ const LiveFieldComponent = (function(){
       async function ballFly(to,dur,peak){st.ball.vis=true;const f={x:HOME.x,y:HOME.y};await tween(dur,p=>{st.ball.x=f.x+(to.x-f.x)*p;st.ball.y=f.y+(to.y-f.y)*p;st.ball.h=peak*Math.sin(Math.PI*p);});st.ball.h=0;}
       async function ballGround(to,dur){st.ball.vis=true;const f={x:HOME.x,y:HOME.y};await tween(dur,p=>{const e=easeOut(p);st.ball.x=f.x+(to.x-f.x)*e;st.ball.y=f.y+(to.y-f.y)*e;st.ball.h=Math.abs(Math.sin(p*Math.PI*4))*4*(1-p);});st.ball.h=0;}
 
-      const tgt = POS_XY[dir]||POS_XY.CF;
+      // 打球到達点(守備名ラベルとは別。LF/RFはライン際でなく内側へ)
+      const HIT_XY = {
+        P:POS_XY.P, C:POS_XY.C, "1B":POS_XY["1B"], "2B":POS_XY["2B"],
+        SS:POS_XY.SS, "3B":POS_XY["3B"],
+        LF:{x:cx-88, y:cy-118}, 左:{x:cx-88, y:cy-118},
+        CF:{x:cx,    y:cy-138}, 中:{x:cx,    y:cy-138},
+        RF:{x:cx+88, y:cy-118}, 右:{x:cx+88, y:cy-118},
+        投:POS_XY.P, 捕:POS_XY.C, 一:POS_XY["1B"], 二:POS_XY["2B"],
+        遊:POS_XY.SS, 三:POS_XY["3B"],
+      };
+      const tgt = HIT_XY[dir]||HIT_XY.CF;
 
       // 振り分け
       (async()=>{
         if(code==="HR"){
           const hp=HR_XY[dir]||HR_XY._def;
           fxTxt("ホームラン！！","#C62828",34,98);
-          await ballFly(hp,800,55);
+          await ballFly(hp,1100,55);
           firework(hp.x,hp.y);firework(hp.x-28,hp.y+16);firework(hp.x+28,hp.y+16);
-          st.ball.vis=false; await wait(900);
+          st.ball.vis=false; await wait(1200);
         } else if(ANIM_HIT.has(code)){
           const jp=codeJa[code]||"ヒット";
           fxTxt(jp+"！","#1565C0",30,98, dir?("打球方向："+(dirLabel[dir]||dir)):"");
-          await ballFly(tgt,640,30);
-          await wait(700);
+          await ballFly(tgt,950,30);
+          await wait(1000);
         } else if(code==="K"||code==="KL"){
           fxTxt(code==="KL"?"見逃し三振！":"三振！","#C62828",32,108);
-          fxStamp("K",HOME.x+46,HOME.y-30,"#C62828");
-          await wait(900);
+          fxStamp("K",HOME.x,HOME.y-18,"#C62828");
+          await wait(1200);
         } else if(code==="BB"||code==="IBB"){
           fxTxt(code==="IBB"?"敬遠":"フォアボール","#6A1B9A",28,108);
-          await wait(800);
+          await wait(1000);
         } else if(code==="HBP"){
           fxTxt("デッドボール","#6A1B9A",28,108);
-          await wait(800);
+          await wait(1000);
         } else if(ANIM_OUT_DIR.has(code)){
           const jp=codeJa[code]||"アウト";
           fxTxt(jp,"#555",24,98, dir?("打球方向："+(dirLabel[dir]||dir)):"");
-          if(code==="FO"||code==="FF"){ await ballFly(tgt,720,44); }
-          else if(code==="LO"){ await ballFly(tgt,320,10); }
-          else { await ballGround(tgt,460); }
+          if(code==="FO"||code==="FF"){ await ballFly(tgt,1050,44); }
+          else if(code==="LO"){ await ballFly(tgt,480,10); }
+          else { await ballGround(tgt,680); }
           fxStamp("OUT",tgt.x,tgt.y-22,"#C62828");
-          await wait(700);
+          await wait(1000);
         } else if(TEXT_ONLY.has(code)){
           const jp=codeJa[code]||code;
           fxTxt(jp,"#C62828",28,108, dir?("打球方向："+(dirLabel[dir]||dir)):"");
-          await wait(1100);
+          await wait(1400);
         } else {
           // その他(盗塁・進塁など)はログmsgから簡易表示
           const jp = codeJa[code] || (entry.msg||"").replace(/【.*?】/,"").slice(0,12) || "プレー";
           fxTxt(jp,"#EF6C00",24,108);
-          await wait(900);
+          await wait(1200);
         }
         // 走者を最新basesへ同期
         st.runners=[];
@@ -3559,7 +3595,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.4")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.6")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3643,7 +3679,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.4")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.6")
         )
 
         // ===== 新規チーム作成 =====
@@ -4541,7 +4577,7 @@ function App() {
                               pitchCount:(pitchers[pidx].pitchCount||0)+1,
                               strikeCount:(pitchers[pidx].strikeCount||0)+1
                             };
-                            return{...g,[defSide+"Pitchers"]:pitchers};
+                            return{...g,[defSide+"Pitchers"]:pitchers,_bso_b:g._bso_b||0,_bso_s:newS};
                           });
                         },
                         style:{background:"#9fb3a520",border:"1.5px solid #9fb3a5",borderRadius:8,color:"#9fb3a5",padding:"9px 0",cursor:isPitchMode?"pointer":"not-allowed",fontSize:13,fontWeight:700,flex:1,opacity:isPitchMode?1:0.3}
@@ -4553,6 +4589,11 @@ function App() {
                           const last = pitchHistory[pitchHistory.length-1];
                           const defSide = curTeam==="away"?"home":"away";
                           setPitchHistory(h=>h.slice(0,-1));
+                          // 取消後のB/Sを算出
+                          let nb=pitchCount.b, ns=pitchCount.s;
+                          if(last==="b") nb=Math.max(0,pitchCount.b-1);
+                          else if(last==="s") ns=Math.max(0,pitchCount.s-1);
+                          else if(last==="f"){ const wasS2=pitchCount.s>0&&pitchCount.f>0; ns=wasS2?Math.max(0,pitchCount.s-1):pitchCount.s; }
                           setPitchCount(p=>{
                             if(last==="b") return {...p,b:Math.max(0,p.b-1)};
                             if(last==="s") return {...p,s:Math.max(0,p.s-1)};
@@ -4566,7 +4607,7 @@ function App() {
                             const pitchers=[...g[defSide+"Pitchers"]||[]];
                             const pidx=g[defSide+"PitcherIdx"]||0;
                             if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:Math.max(0,(pitchers[pidx].pitchCount||0)-1)};
-                            return{...g,[defSide+"Pitchers"]:pitchers};
+                            return{...g,[defSide+"Pitchers"]:pitchers,_bso_b:nb,_bso_s:ns};
                           });
                         },
                         disabled:pitchHistory.length===0,
@@ -4586,7 +4627,7 @@ function App() {
                             const pitchers=[...g[defSide+"Pitchers"]||[]];
                             const pidx=g[defSide+"PitcherIdx"]||0;
                             if(pitchers[pidx]) pitchers[pidx]={...pitchers[pidx],pitchCount:Math.max(0,(pitchers[pidx].pitchCount||0)-total)};
-                            return{...g,[defSide+"Pitchers"]:pitchers};
+                            return{...g,[defSide+"Pitchers"]:pitchers,_bso_b:0,_bso_s:0};
                           });
                         },
                         disabled:pitchHistory.length===0,
