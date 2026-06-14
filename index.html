@@ -641,6 +641,10 @@ const abbrPos = (pos) => POS_ABBR[pos] || pos;
    LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
    グローバルスコープに定義（ZONES等の定数を利用）
    ============================================================ */
+/* ============================================================
+   LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
+   グローバルスコープに定義（ZONES等の定数を利用）
+   ============================================================ */
 const LiveFieldComponent = (function(){
   const R = React;
 
@@ -897,8 +901,35 @@ const LiveFieldComponent = (function(){
       if(lastSigRef.current===null){ lastSigRef.current=sig; return; } // 初回は再生しない
       if(lastSigRef.current===sig) return;
       lastSigRef.current=sig;
+      // 選手交代・投手交代は専用演出
+      if(latest.logType==="sub" || /交代|登板/.test(latest.msg||"")){
+        playSub(latest);
+        return;
+      }
       playLatest(latest);
     },[latest&&latest.ts, latest&&latest.msg]);
+
+    // 選手交代演出
+    function playSub(entry){
+      const st=stateRef.current;
+      const msg=entry.msg||"";
+      function fxTxt2(txt,color,size,y,sub){ st.effects.push({type:"txt",txt,color,size:size||28,y:y||100,sub,t:performance.now(),dur:2200}); }
+      let title="選手交代", sub="";
+      // 投手交代: 【チーム】投手交代: 新投手 登板（...）
+      let m=msg.match(/投手交代:\s*(.+?)\s*登板/);
+      if(m){ title="投手交代！"; sub=m[1]+" 投手"; }
+      else {
+        // 野手交代: 【チーム】交代: 退(ポジ) → 新(ポジ) ...
+        m=msg.match(/交代:\s*(.+?)\(([^)]*)\)\s*→\s*(.+?)\(([^)]*)\)/);
+        if(m){ title="選手交代！"; sub=m[3]+"（"+(m[4]||"-")+"）"; }
+        else {
+          // ポジション変更: ポジション変更: 選手 旧→新
+          m=msg.match(/ポジション変更:\s*(.+?)\s+(.+?)→(.+?)\s*\(/);
+          if(m){ title="守備変更"; sub=m[1]+" "+m[2]+"→"+m[3]; }
+        }
+      }
+      fxTxt2(title,"#7dd3fc",30,100, sub);
+    }
 
     // プレー再生
     function playLatest(entry){
@@ -932,18 +963,25 @@ const LiveFieldComponent = (function(){
 
       // 振り分け
       (async()=>{
+        const BEAT = 550; // 打球が着弾してから結果テロップまでの「一呼吸」
         if(code==="HR"){
           const hp=HR_XY[dir]||HR_XY._def;
-          fxTxt("ホームラン！！","#C62828",34,98);
+          // 打球を飛ばす(結果はまだ出さない)
           await ballFly(hp,1100,55);
+          await wait(BEAT);
+          // 一呼吸おいて結果＋花火
+          fxTxt("ホームラン！！","#C62828",34,98);
           firework(hp.x,hp.y);firework(hp.x-28,hp.y+16);firework(hp.x+28,hp.y+16);
-          st.ball.vis=false; await wait(1200);
+          st.ball.vis=false; await wait(1300);
         } else if(ANIM_HIT.has(code)){
           const jp=codeJa[code]||"ヒット";
-          fxTxt(jp+"！","#1565C0",30,98, dir?("打球方向："+(dirLabel[dir]||dir)):"");
           await ballFly(tgt,950,30);
-          await wait(1000);
+          await wait(BEAT);
+          fxTxt(jp+"！","#1565C0",30,98, dir?("打球方向："+(dirLabel[dir]||dir)):"");
+          await wait(1100);
         } else if(code==="K"||code==="KL"){
+          // 三振は打球なし。投球→間→判定
+          await wait(350);
           fxTxt(code==="KL"?"見逃し三振！":"三振！","#C62828",32,108);
           fxStamp("K",HOME.x,HOME.y-18,"#C62828");
           await wait(1200);
@@ -955,10 +993,12 @@ const LiveFieldComponent = (function(){
           await wait(1000);
         } else if(ANIM_OUT_DIR.has(code)){
           const jp=codeJa[code]||"アウト";
-          fxTxt(jp,"#555",24,98, dir?("打球方向："+(dirLabel[dir]||dir)):"");
+          // 打球を飛ばす → 着弾 → 一呼吸 → アウト判定
           if(code==="FO"||code==="FF"){ await ballFly(tgt,1050,44); }
           else if(code==="LO"){ await ballFly(tgt,480,10); }
           else { await ballGround(tgt,680); }
+          await wait(BEAT);
+          fxTxt(jp,"#555",24,98, dir?("打球方向："+(dirLabel[dir]||dir)):"");
           fxStamp("OUT",tgt.x,tgt.y-22,"#C62828");
           await wait(1000);
         } else if(TEXT_ONLY.has(code)){
@@ -3595,7 +3635,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.6")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.7")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3679,7 +3719,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.6")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.7")
         )
 
         // ===== 新規チーム作成 =====
@@ -6430,7 +6470,11 @@ function App() {
           const regT = _allTeams.find(t=>t.name===game[pcTeam+"Team"]);
           const allMembers = regT
             ? ((regT.members)||[]).map(m=>typeof m==="string"?m:(m.name||"")).filter(Boolean)
-            : _allTeams.flatMap(t=>(t.members||[]).map(m=>typeof m==="string"?m:(m.name||""))).filter(Boolean);
+            : [
+                // 登録チームが見つからない場合: その試合のメンバーのみ(他チーム混入を防ぐ)
+                ...(pcLineup.map(p=>p&&p.name).filter(Boolean)),
+                ...(pcPitchers.map(p=>p&&p.name).filter(Boolean))
+              ].filter(Boolean);
           const newPitcherCandidates = [...new Set(allMembers)];
           return (
             React.createElement('div', {style:S.overlay, onClick:()=>setModal(null)}
