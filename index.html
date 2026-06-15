@@ -645,6 +645,14 @@ const abbrPos = (pos) => POS_ABBR[pos] || pos;
    LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
    グローバルスコープに定義（ZONES等の定数を利用）
    ============================================================ */
+/* ============================================================
+   LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
+   グローバルスコープに定義（ZONES等の定数を利用）
+   ============================================================ */
+/* ============================================================
+   LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
+   グローバルスコープに定義（ZONES等の定数を利用）
+   ============================================================ */
 const LiveFieldComponent = (function(){
   const R = React;
 
@@ -748,7 +756,8 @@ const LiveFieldComponent = (function(){
     const game = props.game||{};
     const canvasRef = R.useRef(null);
     const stateRef = R.useRef({
-      runners:[], ball:{x:HOME.x,y:HOME.y,vis:false,h:0}, effects:[], particles:[], raf:0
+      runners:[], ball:{x:HOME.x,y:HOME.y,vis:false,h:0}, effects:[], particles:[], raf:0,
+      animating:false, syncedBases:null
     });
     const lastSigRef = R.useRef(null);
 
@@ -765,7 +774,8 @@ const LiveFieldComponent = (function(){
     if(curPitcher && curPitcher.name){ posName["投"]=curPitcher.name; posName["P"]=curPitcher.name; }
 
     // 現在の走者(bases)
-    const bases = game.bases||[null,null,null];
+    const _rb = game.bases||[null,null,null];
+    const bases = Array.isArray(_rb)?_rb:[0,1,2].map(i=>(_rb[i]!=null?_rb[i]:null));
 
     // 現在の打者名(攻撃側のBatterIdx)
     const offSide2 = half==="top"?"away":"home";
@@ -784,12 +794,18 @@ const LiveFieldComponent = (function(){
       const field=buildField();
       const st=stateRef.current;
 
-      // 走者スプライトをbasesから同期(初期)
+      // 走者スプライトをbasesから同期(アニメ中は触らない)
       function syncRunnersFromBases(){
         st.runners=[];
         for(let i=0;i<3;i++){ if(bases[i]) st.runners.push({pos:i+1,name:bases[i],color:"#FFB300"}); }
+        st.syncedBases=bases.join(",");
       }
-      if(st.runners.length===0) syncRunnersFromBases();
+      // アニメ再生中でなく、かつbasesが前回同期から変わっていれば同期
+      if(!st.animating && st.syncedBases!==bases.join(",")){
+        syncRunnersFromBases();
+      } else if(st.runners.length===0 && !st.animating){
+        syncRunnersFromBases();
+      }
 
       function basePos(p){
         const i=Math.floor(p), f=p-i;
@@ -946,8 +962,8 @@ const LiveFieldComponent = (function(){
       const wait=ms=>new Promise(r=>setTimeout(r,ms));
       function tween(dur,fn){return new Promise(res=>{const t0=performance.now();function s(t){const p=Math.min(1,(t-t0)/dur);fn(p);if(p<1)requestAnimationFrame(s);else res();}requestAnimationFrame(s);});}
       const easeOut=p=>1-Math.pow(1-p,2);
-      async function ballFly(to,dur,peak){st.ball.vis=true;const f={x:HOME.x,y:HOME.y};await tween(dur,p=>{st.ball.x=f.x+(to.x-f.x)*p;st.ball.y=f.y+(to.y-f.y)*p;st.ball.h=peak*Math.sin(Math.PI*p);});st.ball.h=0;}
-      async function ballGround(to,dur){st.ball.vis=true;const f={x:HOME.x,y:HOME.y};await tween(dur,p=>{const e=easeOut(p);st.ball.x=f.x+(to.x-f.x)*e;st.ball.y=f.y+(to.y-f.y)*e;st.ball.h=Math.abs(Math.sin(p*Math.PI*4))*4*(1-p);});st.ball.h=0;}
+      async function ballFly(to,dur,peak){st.ball.x=HOME.x;st.ball.y=HOME.y;st.ball.h=0;st.ball.vis=true;const f={x:HOME.x,y:HOME.y};await tween(dur,p=>{st.ball.x=f.x+(to.x-f.x)*p;st.ball.y=f.y+(to.y-f.y)*p;st.ball.h=peak*Math.sin(Math.PI*p);});st.ball.h=0;}
+      async function ballGround(to,dur){st.ball.x=HOME.x;st.ball.y=HOME.y;st.ball.h=0;st.ball.vis=true;const f={x:HOME.x,y:HOME.y};await tween(dur,p=>{const e=easeOut(p);st.ball.x=f.x+(to.x-f.x)*e;st.ball.y=f.y+(to.y-f.y)*e;st.ball.h=Math.abs(Math.sin(p*Math.PI*4))*4*(1-p);});st.ball.h=0;}
 
       // 打球到達点(守備名ラベルとは別。LF/RFはライン際でなく内側へ)
       const HIT_XY = {
@@ -961,16 +977,30 @@ const LiveFieldComponent = (function(){
       };
       const tgt = HIT_XY[dir]||HIT_XY.CF;
 
+      // 走者を最新basesへ反映する関数(結果テロップと同時に呼ぶ)
+      function revealRunners(){
+        st.runners=[];
+        const _r=game.bases||[null,null,null];
+        const nb=Array.isArray(_r)?_r:[0,1,2].map(i=>(_r[i]!=null?_r[i]:null));
+        for(let i=0;i<3;i++){ if(nb[i]) st.runners.push({pos:i+1,name:nb[i],color:"#FFB300"}); }
+        st.syncedBases=nb.join(",");
+      }
+
+      st.animating=true; // アニメ中はbasesの自動同期を止める
+      st.ball.vis=false; st.ball.x=HOME.x; st.ball.y=HOME.y; st.ball.h=0; // 前プレーの残像を消す
+
       // 振り分け
       (async()=>{
+       try{
         const BEAT = 550; // 打球が着弾してから結果テロップまでの「一呼吸」
         if(code==="HR"){
           const hp=HR_XY[dir]||HR_XY._def;
           // 打球を飛ばす(結果はまだ出さない)
           await ballFly(hp,1100,55);
           await wait(BEAT);
-          // 一呼吸おいて結果＋花火
+          // 一呼吸おいて結果＋花火＋走者点灯
           fxTxt("ホームラン！！","#C62828",34,98);
+          revealRunners();
           firework(hp.x,hp.y);firework(hp.x-28,hp.y+16);firework(hp.x+28,hp.y+16);
           st.ball.vis=false; await wait(1300);
         } else if(ANIM_HIT.has(code)){
@@ -978,18 +1008,22 @@ const LiveFieldComponent = (function(){
           await ballFly(tgt,950,30);
           await wait(BEAT);
           fxTxt(jp+"！","#1565C0",30,98, dir?("打球方向："+(dirLabel[dir]||dir)):"");
+          revealRunners();
           await wait(1100);
         } else if(code==="K"||code==="KL"){
           // 三振は打球なし。投球→間→判定
           await wait(350);
           fxTxt(code==="KL"?"見逃し三振！":"三振！","#C62828",32,108);
           fxStamp("K",HOME.x,HOME.y-18,"#C62828");
+          revealRunners();
           await wait(1200);
         } else if(code==="BB"||code==="IBB"){
           fxTxt(code==="IBB"?"敬遠":"フォアボール","#6A1B9A",28,108);
+          revealRunners();
           await wait(1000);
         } else if(code==="HBP"){
           fxTxt("デッドボール","#6A1B9A",28,108);
+          revealRunners();
           await wait(1000);
         } else if(ANIM_OUT_DIR.has(code)){
           const jp=codeJa[code]||"アウト";
@@ -1000,23 +1034,28 @@ const LiveFieldComponent = (function(){
           await wait(BEAT);
           fxTxt(jp,"#555",24,98, dir?("打球方向："+(dirLabel[dir]||dir)):"");
           fxStamp("OUT",tgt.x,tgt.y-22,"#C62828");
+          revealRunners();
           await wait(1000);
         } else if(TEXT_ONLY.has(code)){
           const jp=codeJa[code]||code;
           fxTxt(jp,"#C62828",28,108, dir?("打球方向："+(dirLabel[dir]||dir)):"");
+          revealRunners();
           await wait(1400);
         } else {
           // その他(盗塁・進塁など)はログmsgから簡易表示
           const jp = codeJa[code] || (entry.msg||"").replace(/【.*?】/,"").slice(0,12) || "プレー";
           fxTxt(jp,"#EF6C00",24,108);
+          revealRunners();
           await wait(1200);
         }
-        // 走者を最新basesへ同期
-        st.runners=[];
-        const nb=game.bases||[null,null,null];
-        for(let i=0;i<3;i++){ if(nb[i]) st.runners.push({pos:i+1,name:nb[i],color:"#FFB300"}); }
         if(runs>0) fxTxt("得点！","#C62828",26,140);
         st.ball.vis=false;
+       }finally{
+        // エラーが起きても最終的にbasesへ反映し、自動同期を再開
+        revealRunners();
+        st.ball.vis=false;
+        st.animating=false;
+       }
       })();
     }
 
@@ -2295,7 +2334,11 @@ function App() {
       const zl=ZONES.find(z=>z.id===dir);
       const baseLabel = b => b===0?'一塁':b===1?'二塁':b===2?'三塁':b==='scored'?'得点':b==='out'?'アウト':'?';
       // ランナー移動サマリー（手動調整分）
-      const preBasesSnap = g.bases || [null,null,null];
+      // g.bases はFirebase経由でオブジェクト化される場合があるため配列に正規化
+      const _rawBases = g.bases || [null,null,null];
+      const preBasesSnap = Array.isArray(_rawBases)
+        ? _rawBases
+        : [0,1,2].map(i => _rawBases[i] != null ? _rawBases[i] : null);
       let runnerNote = '';
       {
         const moved = [];
@@ -2419,7 +2462,8 @@ function App() {
     mutGame(g=>{
       const lk = team+"Lineup";
       let lineup = [...g[lk]];
-      let newBases = [...g.bases];
+      const _gb = Array.isArray(g.bases) ? g.bases : [0,1,2].map(i => (g.bases&&g.bases[i]!=null)?g.bases[i]:null);
+      let newBases = [..._gb];
       let scoreAdd = 0;
       const scoredRunners = [];
 
@@ -2530,9 +2574,10 @@ function App() {
   const recordSpecialPlay = useCallback((team, code, advanceBases, runs)=>{
     const sp = SPECIAL_PLAYS.find(p=>p.code===code);
     mutGame(g=>{
-      const newBases = advanceBases !== undefined ? advanceBases : g.bases;
+      const _gb2 = Array.isArray(g.bases) ? g.bases : [0,1,2].map(i => (g.bases&&g.bases[i]!=null)?g.bases[i]:null);
+      const newBases = advanceBases !== undefined ? advanceBases : _gb2;
       // 得点したランナー名を特定（元の塁から消えて新basesにもいない選手）
-      const oldBases = g.bases || [null,null,null];
+      const oldBases = _gb2;
       const scoredRunners = (oldBases).filter(n => n && !(newBases||[]).includes(n));
       const updatedLineup = g[team+"Lineup"].map(p => {
         if(scoredRunners.includes(p.name)) return {...p, run:(p.run||0)+1};
@@ -3635,7 +3680,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.7")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.9")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3719,7 +3764,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.7")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.9")
         )
 
         // ===== 新規チーム作成 =====
