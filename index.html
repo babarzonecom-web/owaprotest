@@ -584,7 +584,7 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
               ["投","捕","一","二","三","遊","左","中","右"].map(pos => {
                 const defLineup = defTeamLineup||[];
                 const posMap = {};
-                defLineup.forEach(p=>{ if(p.pos) posMap[abbrPos(p.pos)]=p.name; });
+                defLineup.forEach(p=>{ if(p&&p.pos) posMap[abbrPos(p.pos)]=p.name; });
                 const pname = posMap[pos];
                 return React.createElement('button', {
                   key: pos,
@@ -1136,8 +1136,8 @@ const recomputeScores = (g) => {
   ]);
   allInns.forEach(inn=>{
     let ar=0, hr=0, aHas=false, hHas=false;
-    g.awayLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ ar+=norm(e).runs||0; aHas=true; }));
-    g.homeLineup.forEach(p=>toList(p.atBats,inn).forEach(e=>{ hr+=norm(e).runs||0; hHas=true; }));
+    (g.awayLineup||[]).forEach(p=>{ if(p) toList(p.atBats,inn).forEach(e=>{ ar+=norm(e).runs||0; aHas=true; }); });
+    (g.homeLineup||[]).forEach(p=>{ if(p) toList(p.atBats,inn).forEach(e=>{ hr+=norm(e).runs||0; hHas=true; }); });
 
     // atBatsのruns合計を正とし、盗塁等（recordSBで直接加算）の分を上乗せする
     // recordSBはscoreKeyに直接加算しているので、atBatsで説明できない分がある
@@ -1883,10 +1883,17 @@ function App() {
   const rawGame   = storage.currentGame;
   // Firebaseから受信したデータはarrayがobjectに変換されるため正規化
   const _toArr = (v, def) => Array.isArray(v) ? v : (v && typeof v==="object" ? Object.values(v) : def);
+  // bases専用: 疎配列(走者が一部の塁のみ)でもインデックスを保持して復元する
+  // 例 {0:"A",2:"B"} → ["A",null,"B"]  (Object.valuesだと["A","B"]になり走者位置がズレる)
+  const _toBases = (v) => {
+    if(Array.isArray(v)) return [v[0]??null, v[1]??null, v[2]??null];
+    if(v && typeof v==="object") return [0,1,2].map(i=> v[i]!=null ? v[i] : null);
+    return [null,null,null];
+  };
   const _fixPlayer = (p) => p ? {...p, atBats: (p.atBats && typeof p.atBats==="object") ? p.atBats : {}} : p;
   const game = rawGame ? {
     ...rawGame,
-    bases:          _toArr(rawGame.bases, [null,null,null]),
+    bases:          _toBases(rawGame.bases),
     awayLineup:     _toArr(rawGame.awayLineup, []).map(_fixPlayer),
     homeLineup:     _toArr(rawGame.homeLineup, []).map(_fixPlayer),
     awayPitchers:   _toArr(rawGame.awayPitchers, []),
@@ -3680,7 +3687,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.11")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.12")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3764,7 +3771,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.11")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.12")
         )
 
         // ===== 新規チーム作成 =====
@@ -6974,7 +6981,7 @@ function App() {
           const POS_LIST = ["投","捕","一","二","三","遊","左","中","右"];
           
           const posMap = {};
-          defLineup.forEach(p=>{ if(p.pos) { const abbr=abbrPos(p.pos); if(POS_LIST.includes(abbr)) posMap[abbr]=p.name; } });
+          defLineup.forEach(p=>{ if(p&&p.pos) { const abbr=abbrPos(p.pos); if(POS_LIST.includes(abbr)) posMap[abbr]=p.name; } });
           return (
             React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
               , React.createElement('div', { style: {...S.mBox,maxWidth:380}, onClick: e=>e.stopPropagation(),}
