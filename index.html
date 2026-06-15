@@ -3687,7 +3687,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.12")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.13")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3771,7 +3771,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.12")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.13")
         )
 
         // ===== 新規チーム作成 =====
@@ -5295,17 +5295,22 @@ function App() {
                             save: p.save,
                             hold: p.hold,
                             bs:   p.bs,
-                            // manualIpは保持
-                            ...(p.manualIp!==undefined?{manualIp:p.manualIp}:{}),
+                            // 手動修正値(manual*)は全て保持する。存在するものだけ引き継ぐ
+                            ...(p.manualIp !==undefined?{manualIp:p.manualIp}:{}),
+                            ...(p.manualH  !==undefined?{manualH:p.manualH}:{}),
+                            ...(p.manualBb !==undefined?{manualBb:p.manualBb}:{}),
+                            ...(p.manualK  !==undefined?{manualK:p.manualK}:{}),
+                            ...(p.manualHbp!==undefined?{manualHbp:p.manualHbp}:{}),
+                            ...(p.manualHr !==undefined?{manualHr:p.manualHr}:{}),
                           };
                           if(p.manualOverride){
-                            // 手動修正あり: erとautoRunsは保持、他はautoで更新
+                            // 手動修正あり: er/autoRunsは保持、auto*は再計算値で更新
                             return {...base,
                               manualOverride: true,
                               er:      p.er,
                               autoEr:  p.autoEr,
                               autoRuns:p.autoRuns,
-                              // 被安打等はautoで更新
+                              // 被安打等のauto値はautoで更新(manual値は上のbaseで保持済み)
                               autoH:    a.autoH||0,
                               autoBb:   a.autoBb||0,
                               autoK:    a.autoK||0,
