@@ -380,6 +380,94 @@ function MiniDiamond({ bases, size=56 }) {
 }
 const BASE_LABELS = ["1塁","2塁","3塁","ホームイン🏠","アウト❌"];
 const BASE_COLORS = ["#ffb52e","#2dd068","#ff7d72","#f97316","#9fb3a5"];
+
+// 日付ピッカー: 自前stateで値を保持し、親(game)のポーリング再描画でカレンダーが閉じないようにする
+// 自前カレンダーモーダル: OSのdateピッカーを使わず、アプリが状態管理する
+// → ポーリングで親が再描画されてもモーダルが閉じない(記録モーダルと同じ仕組み)
+function DatePickerModal({ value, onConfirm, onClose }){
+  const today = new Date();
+  const parse = (s)=>{
+    const m=(s||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(m) return {y:+m[1], mo:+m[2], d:+m[3]};
+    return {y:today.getFullYear(), mo:today.getMonth()+1, d:today.getDate()};
+  };
+  const init = parse(value);
+  const [viewY, setViewY] = React.useState(init.y);
+  const [viewM, setViewM] = React.useState(init.mo);
+  const [selY, setSelY] = React.useState(init.y);
+  const [selM, setSelM] = React.useState(init.mo);
+  const [selD, setSelD] = React.useState(init.d);
+  const pad = n => String(n).padStart(2,"0");
+  const daysInMonth = new Date(viewY, viewM, 0).getDate();
+  const firstDow = new Date(viewY, viewM-1, 1).getDay();
+  const startBlank = (firstDow + 6) % 7;
+  const prevMonth = ()=>{ if(viewM===1){ setViewY(viewY-1); setViewM(12); } else setViewM(viewM-1); };
+  const nextMonth = ()=>{ if(viewM===12){ setViewY(viewY+1); setViewM(1); } else setViewM(viewM+1); };
+  const cells = [];
+  for(let i=0;i<startBlank;i++) cells.push(null);
+  for(let d=1;d<=daysInMonth;d++) cells.push(d);
+  const isSelected = (d)=> d===selD && viewY===selY && viewM===selM;
+  const isToday = (d)=> viewY===today.getFullYear() && viewM===today.getMonth()+1 && d===today.getDate();
+  const _btn = {background:"#16331f",border:"1px solid #2e4234",borderRadius:8,color:"#dff0e5",padding:"8px 14px",fontSize:16,cursor:"pointer"};
+  const E = React.createElement;
+  return E('div', {
+      style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,
+        display:"flex",alignItems:"center",justifyContent:"center",padding:20},
+      onClick: (ev)=>{ ev.stopPropagation(); onClose(); }
+    },
+    E('div', {
+      onClick: ev=>ev.stopPropagation(),
+      style:{background:"#0f2018",border:"1px solid #2e4234",borderRadius:16,
+        padding:18,width:"100%",maxWidth:340,boxShadow:"0 12px 40px rgba(0,0,0,0.5)"}
+    },
+      E('div',{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}
+        , E('button',{onClick:(ev)=>{ev.stopPropagation();prevMonth();}, style:_btn}, "‹")
+        , E('div',{style:{fontSize:18,fontWeight:700,color:"#dff0e5"}}, viewY+"年 "+viewM+"月")
+        , E('button',{onClick:(ev)=>{ev.stopPropagation();nextMonth();}, style:_btn}, "›")
+      ),
+      E('div',{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:6}}
+        , ["月","火","水","木","金","土","日"].map((w,i)=>
+            E('div',{key:i,style:{textAlign:"center",fontSize:11,color:i>=5?"#7fa8d0":"#74897b",fontWeight:600}}, w))
+      ),
+      E('div',{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4}}
+        , cells.map((d,i)=> d===null
+            ? E('div',{key:"b"+i})
+            : E('button',{ key:i,
+                onClick:(ev)=>{ ev.stopPropagation(); setSelY(viewY); setSelM(viewM); setSelD(d); },
+                style:{ aspectRatio:"1",border:"none",borderRadius:8,cursor:"pointer",
+                  fontSize:15,fontWeight: isSelected(d)?800:500,
+                  background: isSelected(d)?"#1d7a3e":(isToday(d)?"#16331f":"transparent"),
+                  color: isSelected(d)?"#fff":"#cfe8d5" }
+              }, d)
+          )
+      ),
+      E('div',{style:{display:"flex",gap:8,marginTop:16}}
+        , E('button',{onClick:(ev)=>{ev.stopPropagation();onClose();}, style:{..._btn,flex:1,background:"#1a2a20",color:"#9fb3a5"}}, "キャンセル")
+        , E('button',{ onClick:(ev)=>{ ev.stopPropagation(); onConfirm(selY+"-"+pad(selM)+"-"+pad(selD)); },
+            style:{..._btn,flex:1,background:"#1d7a3e",color:"#fff",fontWeight:700} }, "決定")
+      )
+    )
+  );
+}
+
+// 日付欄: タップで自前カレンダーモーダルを開く(OSピッカー不使用)
+function DateEditor({ value, onChange, style }){
+  const [open, setOpen] = React.useState(false);
+  const E = React.createElement;
+  return E('label', { style:{display:"flex",flexDirection:"column",gap:3} }
+    , E('span', { style:{fontSize:11,color:"#74897b"} }, "日付")
+    , E('div', {
+        onClick:(ev)=>{ ev.stopPropagation(); setOpen(true); },
+        style:{...style, cursor:"pointer", minWidth:120}
+      }, value||"日付を選択")
+    , open && E(DatePickerModal, {
+        value: value,
+        onConfirm: (v)=>{ setOpen(false); if(v) onChange(v); },
+        onClose: ()=>setOpen(false)
+      })
+  );
+}
+
 function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, batterScored: initBatterScored, batterOut, outs, onConfirm, onCancel, defTeamLineup, pendingCode, preErrorPos, runnerDefault }) {
   
   // postBasesで見つからないランナーのデフォルト先
@@ -390,6 +478,11 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
 
   const buildRunners = () => {
     const list = [];
+
+    // DP/TPで走者が1人だけのとき、その走者は必ずアウト(論理的に確定)
+    const _preRunnerCount = (preBases||[]).filter(Boolean).length;
+    const _isDP = pendingCode==="DP" || pendingCode==="TP";
+    const _soloDpOut = _isDP && _preRunnerCount===1;
 
     // 既存ランナーの処理
     preBases.forEach((name, i) => {
@@ -404,8 +497,8 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
       for (let j = 0; j < 3; j++) {
         if (postBases[j] === name) { to = j; break; }
       }
-      // 見つからない場合: batterOutならout、そうでなければscored
-      if (to === null) to = runnerDefaultTo;
+      // 見つからない場合: DP/TPで走者1人なら必ずout、それ以外はdefault
+      if (to === null) to = _soloDpOut ? "out" : runnerDefaultTo;
       list.push({ name, from: i, to });
     });
 
@@ -488,6 +581,10 @@ function RunnerAdjustModal({ preBases, postBases, preScoredNames, batterName, ba
         , runners.length > 0 ? (
           React.createElement('div', { style: {marginBottom:16},}
             , React.createElement('div', { style: {fontSize:12,color:"#7db8e8",marginBottom:8,fontWeight:700},}, "選手の行き先")
+            , ((pendingCode==="DP"||pendingCode==="TP") && (preBases||[]).filter(Boolean).length>=2) && React.createElement('div', {
+                style: {fontSize:11,color:"#ffb52e",background:"#2a2410",border:"1px solid #5a4a1a",
+                  borderRadius:8,padding:"8px 10px",marginBottom:10,fontWeight:700,lineHeight:1.4},
+              }, "⚠️ ランナーの動きを確認してください（誰がアウトか・進塁したかをタップで設定）")
             , React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:6},}
               , runners.map((r, i) => (
                 React.createElement('div', { key: i, style: {display:"flex",alignItems:"center",gap:8,
@@ -653,6 +750,10 @@ const abbrPos = (pos) => POS_ABBR[pos] || pos;
    LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
    グローバルスコープに定義（ZONES等の定数を利用）
    ============================================================ */
+/* ============================================================
+   LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
+   グローバルスコープに定義（ZONES等の定数を利用）
+   ============================================================ */
 const LiveFieldComponent = (function(){
   const R = React;
 
@@ -760,6 +861,7 @@ const LiveFieldComponent = (function(){
       animating:false, syncedBases:null
     });
     const lastSigRef = R.useRef(null);
+    const finishedRef = R.useRef(false);
 
     // 守備位置→選手名マップ(守備側)
     const half = game.half||"top";
@@ -900,6 +1002,32 @@ const LiveFieldComponent = (function(){
             ctx.font="900 24px -apple-system,sans-serif";ctx.textAlign="center";
             ctx.lineWidth=6;ctx.strokeStyle="#fff";ctx.strokeText(e.txt,0,0);
             ctx.fillStyle=e.color;ctx.fillText(e.txt,0,0);ctx.restore();
+          } else if(e.type==="gameset"){
+            ctx.save();
+            ctx.translate(-OFX,-OFY);
+            // 暗幕
+            const veil = t<0.3? (t/0.3)*0.55 : (t>0.8?(1-(t-0.8)/0.2)*0.55:0.55);
+            ctx.globalAlpha=veil; ctx.fillStyle="#000";
+            ctx.fillRect(0,0,CW,CH);
+            // GAME SET 文字
+            const pop = t<0.25? (t/0.25) : 1;
+            const sc2 = 0.6+0.4*Math.min(1,pop*1.4);
+            const al2 = t>0.85?1-(t-0.85)/0.15:1;
+            ctx.globalAlpha=al2;
+            ctx.textAlign="center";
+            ctx.translate(CW/2, CH/2-6);
+            ctx.scale(sc2,sc2);
+            // ゴールドグラデ風(2色重ね)
+            ctx.font="900 46px -apple-system,sans-serif";
+            ctx.lineWidth=8; ctx.strokeStyle="#1a1000";
+            ctx.strokeText("GAME SET", 0, 0);
+            ctx.fillStyle="#FFD54F";
+            ctx.fillText("GAME SET", 0, 0);
+            ctx.font="900 20px -apple-system,sans-serif";
+            ctx.lineWidth=5; ctx.strokeStyle="#1a1000";
+            ctx.strokeText("!!", 0, 30);
+            ctx.fillStyle="#FFD54F";
+            ctx.restore();
           }
           return true;
         });
@@ -924,6 +1052,16 @@ const LiveFieldComponent = (function(){
       }
       playLatest(latest);
     },[latest&&latest.ts, latest&&latest.msg]);
+
+    // 試合終了でGAME SET演出
+    R.useEffect(()=>{
+      if(game.finished && !finishedRef.current){
+        finishedRef.current=true;
+        const st=stateRef.current;
+        st.effects.push({type:"gameset",t:performance.now(),dur:4000});
+      }
+      if(!game.finished) finishedRef.current=false;
+    },[game.finished]);
 
     // 選手交代演出
     function playSub(entry){
@@ -1158,25 +1296,28 @@ const recomputeScores = (g) => {
 const computeOneStats = (p) => {
   let ab=0,h=0,hr=0,bb=0,hbp=0,k=0,tb=0,r=0,sac=0,sf=0;
   const atBatsObj = p.atBats || {};
+  let ci=0;
   Object.values(atBatsObj).flat().forEach(e=>{
     const ne=norm(e); const code=ne.code; if(!code) return;
     if(!NOAB_CODES.has(code)) ab++;
     if(HIT_CODES.has(code)){h++;tb+=code==="H1"?1:code==="H2"?2:code==="H3"?3:4;}
     if(code==="HR") hr++;
-    if(code==="BB"||code==="IBB"||code==="CI") bb++;  // IBB・打撃妨害も四球扱い
+    if(code==="BB"||code==="IBB") bb++;  // IBBは四球に含む。CI(打撃妨害)は四球ではないので除外
+    if(code==="CI") ci++;                // 打撃妨害は独立カウント
     if(code==="HBP") hbp++;
     if(code==="K"||code==="KL"||code==="KW") k++;
     if(code==="SAC") sac++;
     if(code==="SF")  sf++;
   });
   r += (p.run||0);
-  const pa = ab + bb + hbp + sac + sf;  // IBBはbbに含まれるので別途加算不要
+  // 打席数: 打撃妨害も打席として成立するので含める
+  const pa = ab + bb + hbp + sac + sf + ci;
   const slg = ab>0 ? (tb/ab) : 0;
-  // 出塁率: (H+BB+HBP) / (AB+BB+HBP+SF)  ※SFは分母に含める（犠打SACは除外）
+  // 出塁率: (H+BB+HBP)/(AB+BB+HBP+SF)  ※犠打(SAC)と打撃妨害(CI)は分母から除外(公式規則)
   const obp = (ab+bb+hbp+sf)>0 ? ((h+bb+hbp)/(ab+bb+hbp+sf)) : 0;
   const ops = obp + slg;
   const fmtAvg = v => v>0 ? v.toFixed(3).replace(/^0/,"") : ".---";
-  return {...p,_pa:pa,_ab:ab,_h:h,_hr:hr,_bb:bb,_hbp:hbp,_k:k,_tb:tb,_r:r,
+  return {...p,_pa:pa,_ab:ab,_h:h,_hr:hr,_bb:bb,_hbp:hbp,_k:k,_tb:tb,_r:r,_ci:ci,
     _avg:ab>0?(h/ab).toFixed(3).replace(/^0/,""):".---",
     _slg:ab>0?fmtAvg(slg):".---",
     _obp:(ab+bb+hbp)>0?fmtAvg(obp):".---",
@@ -1235,8 +1376,8 @@ const computePitcherStats = (g) => {
     const maxInn = Math.max(
       g.innings||9,
       g.endInning||0,
-      // 実際に記録のある最大イニング
-      ...(offTeam==="away"?g.awayLineup:g.homeLineup||[]).flatMap(p=>Object.keys(p.atBats||{}).map(Number))
+      // 実際に記録のある最大イニング(lineup未定義でもクラッシュしないよう||[]でガード)
+      ...((offTeam==="away"?g.awayLineup:g.homeLineup)||[]).flatMap(p=>Object.keys((p&&p.atBats)||{}).map(Number))
     );
     const _pitInns = Array.from({length:maxInn},(_,i)=>i+1);
     _pitInns.forEach(inn=>{
@@ -1365,8 +1506,8 @@ const computePitcherStats = (g) => {
       if(code==="HR") ps.autoHr = (ps.autoHr||0)+1;
       const runsScored = ab.entry.runs||0;
       if(runsScored > 0) {
-        // 失点帰責: その打席を担当する投手に全失点を帰責（シンプル方式）
-        ps.autoEr = (ps.autoEr||0) + runsScored;
+        // 失点(autoRuns)は機械的に決まるため自動計算。
+        // 自責点(autoEr)はエラー絡みの判定が必要なため、得点時の自責点モーダルで人間が記録する(ここでは加算しない)
         ps.autoRuns = (ps.autoRuns||0) + runsScored;
       }
     });
@@ -1426,8 +1567,8 @@ const computePitcherStats = (g) => {
       const totalFinalOuts = finalHalfOuts + brOutsInFinalHalf;
       const expectedOuts = g.finalOuts;
       if(totalFinalOuts < expectedOuts) {
-        // 差分を最終投手に補完
-        const lastPitcher = stats.length > 0 ? stats[stats.length - 1] : null;
+        // 差分を「実際に最後に投げている投手」に補完(配列末尾だと未登板投手に付く不具合を回避)
+        const lastPitcher = stats[currentPIdx] || (stats.length > 0 ? stats[stats.length - 1] : null);
         if(lastPitcher) {
           const diff = expectedOuts - totalFinalOuts;
           lastPitcher._outsGot += diff;
@@ -3037,7 +3178,7 @@ function App() {
         const ipOuts = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
         const ipDisp = Math.floor(ipOuts/3)+"."+ipOuts%3;
         const h  = p.manualH !==undefined ? p.manualH  : (auto.autoH||0);
-        const er = p.manualOverride && p.er!==undefined ? p.er : (auto.autoEr||0);
+        const er = p.erManual!==undefined ? p.erManual : (p.manualOverride && p.er!==undefined ? p.er : 0);
         const bb = p.manualBb!==undefined ? p.manualBb : (auto.autoBb||0);
         const k  = p.manualK !==undefined ? p.manualK  : (auto.autoK||0);
         const ipNum = Math.floor(ipOuts/3)+(ipOuts%3)/3;
@@ -3553,9 +3694,9 @@ function App() {
               , React.createElement('span', { style: {color:"#2e4234",margin:"0 4px",fontSize:18},}, "—")
               , React.createElement('span', { style: {color:"#7dd3fc"},}, homeTotal)
             )
-            , React.createElement('div', { style: {display:"inline-block",background:"#e02d24",borderRadius:5,
+            , React.createElement('div', { style: {display:"inline-block",background: game.finished?"#3a4a5e":"#e02d24",borderRadius:5,
               padding:"2px 8px",fontSize:11,fontWeight:700,marginTop:2},}
-              , game.inning, "回", game.half==="top"?"表":"裏"
+              , game.finished ? "試合終了" : [game.inning, "回", game.half==="top"?"表":"裏"]
             )
           )
         )
@@ -3687,7 +3828,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.13")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.24")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3771,7 +3912,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.13")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.24")
         )
 
         // ===== 新規チーム作成 =====
@@ -3991,7 +4132,7 @@ function App() {
             const _pitAutoIpOuts = Math.floor((_pitAuto.autoIp||0)/10)*3+((_pitAuto.autoIp||0)%10);
             const _pitIpOuts = _pitcher.manualIp!==undefined?_pitcher.manualIp:_pitAutoIpOuts;
             const _pitIpDisp = Math.floor(_pitIpOuts/3)+"."+(_pitIpOuts%3);
-            const _pitEr = _pitcher.manualOverride&&_pitcher.er!==undefined?_pitcher.er:(_pitAuto.autoEr||0);
+            const _pitEr = _pitcher.erManual!==undefined ? _pitcher.erManual : (_pitcher.manualOverride&&_pitcher.er!==undefined?_pitcher.er:0);
 
             // 現打者の全打席結果（イニング順）
             const batterAbList = [];
@@ -4082,6 +4223,27 @@ function App() {
               }
                 ,React.createElement('span',{style:{fontSize:16}},"🔴")
                 ,"LIVE に戻る"
+              )
+
+              // 「最新の速報を読み込む」ボタン（閲覧モードで常時表示・履歴閲覧中以外）
+              , isReadOnly && window.__teamShareCode && !_showReturnLive && React.createElement('button',{
+                onClick:()=>{
+                  const restUrl = "https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json";
+                  fetch(restUrl,{cache:"no-store"}).then(r=>r.json()).then(data=>{
+                    if(!data||!data.id){ showToast("速報データがありません"); return; }
+                    setStorage(s=>({...s, currentGame:{...s.currentGame,...data}}));
+                    showToast("🔄 最新の速報を読み込みました");
+                  }).catch(()=>showToast("接続できません"));
+                },
+                style:{
+                  background:"#1d4ed8",border:"none",borderRadius:10,
+                  color:"#fff",padding:"10px",width:"100%",
+                  fontSize:13,fontWeight:700,cursor:"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:6
+                }
+              }
+                ,React.createElement('span',{style:{fontSize:15}},"🔄")
+                ,"最新の速報を読み込む"
               )
 
               // ① スコア行（タップでアコーディオン展開）
@@ -4379,13 +4541,14 @@ function App() {
 
           , !isReadOnly && React.createElement('div', { style: S.card,}
             , React.createElement('div', {
-                style: {...S.ct, cursor:"pointer", userSelect:"none", display:"flex", justifyContent:"space-between", alignItems:"center"},
+                style: {...S.ct, cursor:"pointer", userSelect:"none", display:"flex", justifyContent:"space-between", alignItems:"center", gap:10},
                 onClick: ()=>setGameInfoOpen(o=>!o)
               }
-              , React.createElement('span', null, "⚙️ 試合情報")
-              , React.createElement('span', {style:{fontSize:12, color:"#74897b"}},
+              , React.createElement('span', {style:{flexShrink:0, whiteSpace:"nowrap"}}, "⚙️ 試合情報")
+              , React.createElement('span', {style:{fontSize:12, color:"#74897b", flex:1, minWidth:0, textAlign:"right",
+                  overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}},
                 gameInfoOpen ? "▲ 閉じる" :
-                React.createElement('span', null,
+                React.createElement('span', {style:{whiteSpace:"nowrap"}},
                   React.createElement('span', {style:{color:"#ffb52e", fontWeight:700}}, game.awayTeam||"未設定")
                   , React.createElement('span', {style:{color:"#9fb3a5", margin:"0 6px"}}, "vs")
                   , React.createElement('span', {style:{color:"#7dd3fc", fontWeight:700}}, game.homeTeam||"未設定")
@@ -4393,49 +4556,20 @@ function App() {
                   , React.createElement('span', {style:{color:"#74897b", marginLeft:6}}, "▼")
                 )
               )
-            , gameInfoOpen && React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:10,alignItems:"flex-end"},}
+            )
+            , gameInfoOpen && React.createElement('div', { style: {display:"flex",flexDirection:"column",gap:12,marginTop:12},}
               , [["awayTeam","アウェイ",game.awayTeam],["homeTeam","ホーム",game.homeTeam],["venue","球場",game.venue]].map(([k,l,v])=>(
-                React.createElement('label', { key: k, style: {display:"flex",flexDirection:"column",gap:3},}
+                React.createElement('label', { key: k, style: {display:"flex",flexDirection:"column",gap:4},}
                   , React.createElement('span', { style: {fontSize:11,color:"#74897b"},}, l)
-                  , React.createElement('input', { type: "text", value: v, onChange: e=>mutGame(g=>({...g,[k]:e.target.value})), style: S.si,})
+                  , React.createElement('input', { type: "text", value: v||"", onChange: e=>mutGame(g=>({...g,[k]:e.target.value})), style: {...S.si, width:"100%", boxSizing:"border-box"},})
                 )
               ))
               
-              , (()=>{
-                const parts = (game.date||"").split("-");
-                
-                const y = parseInt(parts[0])||new Date().getFullYear();
-                const m = parseInt(parts[1])||1;
-                const d = parseInt(parts[2])||1;
-                const pad = n => String(n).padStart(2,"0");
-                const setDate = (ny,nm,nd) => mutGame(g=>({...g,date:`${ny}-${pad(nm)}-${pad(nd)}`}));
-                const thisYear = new Date().getFullYear();
-                const years  = Array.from({length:6},(_,i)=>thisYear-2+i);
-                const months = Array.from({length:12},(_,i)=>i+1);
-                const daysIn = new Date(y, m, 0).getDate(); 
-                const days   = Array.from({length:daysIn},(_,i)=>i+1);
-                const selSt  = {...S.si, width:"auto", paddingRight:4, cursor:"pointer"};
-                return (
-                  React.createElement('label', { style: {display:"flex",flexDirection:"column",gap:3},}
-                    , React.createElement('span', { style: {fontSize:11,color:"#74897b"},}, "日付")
-                    , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:4},}
-                      , React.createElement('select', { value: y, onChange: e=>setDate(Number(e.target.value),m,d), style: selSt,}
-                        , years.map(yy=>React.createElement('option', { key: yy, value: yy,}, yy))
-                      )
-                      , React.createElement('span', { style: {color:"#74897b",fontSize:12},}, "年")
-                      , React.createElement('select', { value: m, onChange: e=>{ const nm=Number(e.target.value); const maxD=new Date(y,nm,0).getDate(); setDate(y,nm,Math.min(d,maxD)); }, style: selSt,}
-                        , months.map(mm=>React.createElement('option', { key: mm, value: mm,}, mm))
-                      )
-                      , React.createElement('span', { style: {color:"#74897b",fontSize:12},}, "月")
-                      , React.createElement('select', { value: d, onChange: e=>setDate(y,m,Number(e.target.value)), style: selSt,}
-                        , days.map(dd=>React.createElement('option', { key: dd, value: dd,}, dd))
-                      )
-                      , React.createElement('span', { style: {color:"#74897b",fontSize:12},}, "日")
-                    )
-                  )
-                );
-              })()
-            )
+              , React.createElement(DateEditor, {
+                  value: game.date||"",
+                  onChange: (v)=>{ if(v) mutGame(g=>({...g, date:v})); },
+                  style: {...S.si, width:"100%", boxSizing:"border-box"}
+                })
             )
           )
 
@@ -5102,7 +5236,7 @@ function App() {
                             const effectiveIp = p.manualIp!==undefined?p.manualIp:ipOuts;
                             const ipDisp = Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?(effectiveIp%3)+"/3":"");
                             const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
-                            const er = p.manualOverride&&p.er!==undefined?p.er:(auto.autoEr||0);
+                            const er = p.erManual!==undefined ? p.erManual : (p.manualOverride&&p.er!==undefined?p.er:0);
                             const era = ipNum>0?(er*(game.innings||9)/ipNum).toFixed(2):(er>0?"∞":"—");
                             return [React.createElement('tr',{key:"starter"}
                               ,React.createElement('td',{style:{...S.td,minWidth:110}}
@@ -5146,7 +5280,7 @@ function App() {
                             const effectiveIp = p.manualIp!==undefined?p.manualIp:ipOuts;
                             const ipDisp = isReappear ? "—" : Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?(effectiveIp%3)+"/3":"");
                             const ipNum = Math.floor(effectiveIp/3)+(effectiveIp%3)/3;
-                            const er = p.manualOverride&&p.er!==undefined?p.er:(auto.autoEr||0);
+                            const er = p.erManual!==undefined ? p.erManual : (p.manualOverride&&p.er!==undefined?p.er:0);
                             const era = !isReappear&&ipNum>0?(er*(game.innings||9)/ipNum).toFixed(2):(isReappear?"—":er>0?"∞":"—");
                             const dispH   = p.manualH  !==undefined?p.manualH  :(auto.autoH||0);
                             const dispHr  = p.manualHr !==undefined?p.manualHr :(auto.autoHr||0);
@@ -5302,6 +5436,7 @@ function App() {
                             ...(p.manualK  !==undefined?{manualK:p.manualK}:{}),
                             ...(p.manualHbp!==undefined?{manualHbp:p.manualHbp}:{}),
                             ...(p.manualHr !==undefined?{manualHr:p.manualHr}:{}),
+                            ...(p.erManual !==undefined?{erManual:p.erManual}:{}),
                           };
                           if(p.manualOverride){
                             // 手動修正あり: er/autoRunsは保持、auto*は再計算値で更新
@@ -5809,15 +5944,7 @@ function App() {
           const defSide = modal.defSide;
           const pitchers = game[defSide+"Pitchers"]||[];
           const pitLog = game[defSide+"PitcherLog"]||[];
-          // 同イニングに投げた可能性のある投手を特定
-          const inningPitchers = pitLog.filter((l,li)=>{
-            const nextL = pitLog[li+1];
-            const lTime = l.fromInning*2+(l.fromHalf==="top"?0:1);
-            const innTime = modal.inning*2+(defSide==="away"?0:1);
-            const nextTime = nextL ? nextL.fromInning*2+(nextL.fromHalf==="top"?0:1) : 9999;
-            return lTime<=innTime && innTime<nextTime || (lTime===innTime && nextTime===innTime);
-          });
-          // 重複除去してそのイニングに投げた投手のインデックス一覧
+          // そのイニングに投げた投手のインデックス一覧
           const inningIdxSet = new Set();
           pitLog.forEach((l,li)=>{
             const lTime = l.fromInning*2+(l.fromHalf==="top"?0:1);
@@ -5826,58 +5953,81 @@ function App() {
             const nextTime = nextL ? nextL.fromInning*2+(nextL.fromHalf==="top"?0:1) : 9999;
             if(lTime<=innTime && innTime<=nextTime) inningIdxSet.add(l.pitcherIdx);
           });
-          const inningPit = [...inningIdxSet].map(idx=>({idx, name:(pitchers[idx]||{}).name||"投手"+idx}));
+          // 現投手も必ず候補に含める
+          inningIdxSet.add(game[defSide+"PitcherIdx"]||0);
+          const inningPit = [...inningIdxSet].sort((a,b)=>a-b).map(idx=>({idx, name:(pitchers[idx]||{}).name||"投手"+(idx+1)}));
+
+          // 生還した走者を1人ずつ処理
+          const scored = modal.scoredNames || [];
+          const erIndex = modal.erIndex || 0;
+          const curRunner = scored[erIndex] || "走者";
+          const totalRunners = scored.length;
+          const defaultPit = game[defSide+"PitcherIdx"]||0; // デフォルトは現投手
+
+          // 1人分の自責点を記録して次へ進む関数(案1: 自責点のみ記録、失点は自動計算)
+          const recordOne = (pitIdx)=>{ // pitIdx=null なら自責なし
+            if(pitIdx!==null){
+              mutGame(g=>{
+                const ps=[...g[defSide+"Pitchers"]];
+                if(ps[pitIdx]){
+                  // 自責点あり: 指定投手のerManual+1(失点autoRunsは自動計算なので触らない)
+                  ps[pitIdx]={...ps[pitIdx],
+                    erManual:(ps[pitIdx].erManual||0)+1,
+                  };
+                }
+                return {...g,[defSide+"Pitchers"]:ps};
+              });
+            }
+            // 自責なし(pitIdx===null)は何も加算しない(失点は自動、自責点は付かない)
+            // 次の走者へ or 終了
+            if(erIndex+1 < totalRunners){
+              setModal(m=>({...m, erIndex:erIndex+1, selPitIdx:undefined}));
+            } else {
+              setModal(null);
+            }
+          };
 
           return React.createElement('div',{style:{position:"fixed",inset:0,background:"#000a",zIndex:300,
               display:"flex",alignItems:"flex-end",justifyContent:"center"}, onClick:()=>setModal(null)}
             , React.createElement('div',{style:{background:"#122016",borderRadius:"14px 14px 0 0",
                 width:"100%",maxWidth:500,padding:"20px 20px 36px"},onClick:e=>e.stopPropagation()}
+              // 進捗表示(複数走者のとき)
+              , totalRunners>1 && React.createElement('div',{style:{fontSize:11,color:"#74897b",marginBottom:6,textAlign:"right"}},
+                  (erIndex+1)+" / "+totalRunners+"人目")
               , React.createElement('div',{style:{fontSize:15,fontWeight:700,color:"#ffb52e",marginBottom:6}},
-                  modal.runs+"点 入りました")
-              , React.createElement('div',{style:{fontSize:12,color:"#9fb3a5",marginBottom:16}},
-                  "自責点を記録しますか？")
-              , inningPit.length > 1 && React.createElement('div',null
-                  , React.createElement('div',{style:{fontSize:12,color:"#7db8e8",fontWeight:700,marginBottom:8}},"投手を選択")
-                  , React.createElement('div',{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}},
-                      inningPit.map(({idx,name})=>
-                        React.createElement('button',{key:idx,
-                          onClick:e=>{e.stopPropagation();setModal(m=>({...m,selPitIdx:idx}));},
-                          style:{padding:"8px 14px",borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,
-                            background:(modal.selPitIdx===idx)?"#1d4ed8":"#122016",
-                            border:"2px solid "+(modal.selPitIdx===idx?"#3b82f6":"#24402b"),
-                            color:(modal.selPitIdx===idx)?"#fff":"#9fb3a5"}
-                        }, name)
+                  "🏃 "+curRunner+" が生還")
+              , React.createElement('div',{style:{fontSize:13,color:"#9fb3a5",marginBottom:16}},
+                  "この得点は誰の自責点ですか？")
+              // 投手が複数いる場合は投手ボタン、1人なら自責あり/なしの2択
+              , inningPit.length > 1
+                ? React.createElement('div',null
+                    , React.createElement('div',{style:{display:"flex",flexDirection:"column",gap:8}},
+                        inningPit.map(({idx,name})=>
+                          React.createElement('button',{key:idx,
+                            onClick:e=>{e.stopPropagation(); recordOne(idx);},
+                            style:{padding:"14px",borderRadius:10,cursor:"pointer",fontSize:14,fontWeight:700,
+                              background:"#e02d24",border:"none",color:"#fff",textAlign:"left",paddingLeft:18}
+                          }, "⚾ "+name+" の自責点")
+                        )
                       )
-                    )
-                )
-              , React.createElement('div',{style:{display:"flex",gap:10}}
-                , React.createElement('button',{
-                    onClick:()=>{
-                      // 自責点あり
-                      const pitIdx = modal.selPitIdx !== undefined ? modal.selPitIdx
-                        : (inningPit.length===1 ? inningPit[0].idx : (game[defSide+"PitcherIdx"]||0));
-                      mutGame(g=>{
-                        const ps=[...g[defSide+"Pitchers"]];
-                        if(ps[pitIdx]){
-                          ps[pitIdx]={...ps[pitIdx],
-                            manualOverride:true,
-                            er:(ps[pitIdx].er||0)+modal.runs,
-                            autoRuns:(ps[pitIdx].autoRuns||0)+modal.runs,
-                          };
-                        }
-                        return {...g,[defSide+"Pitchers"]:ps};
-                      });
-                      setModal(null);
-                    },
-                    style:{flex:1,padding:"14px",borderRadius:10,cursor:"pointer",
-                      background:"#e02d24",border:"none",color:"#fff",fontSize:15,fontWeight:700}
-                  }, "✅ 自責点あり")
-                , React.createElement('button',{
-                    onClick:()=>setModal(null),
-                    style:{flex:1,padding:"14px",borderRadius:10,cursor:"pointer",
-                      background:"#122016",border:"1px solid #2e4234",color:"#9fb3a5",fontSize:15,fontWeight:700}
-                  }, "なし")
-              )
+                    , React.createElement('button',{
+                        onClick:e=>{e.stopPropagation(); recordOne(null);},
+                        style:{width:"100%",marginTop:8,padding:"14px",borderRadius:10,cursor:"pointer",
+                          background:"#122016",border:"1px solid #2e4234",color:"#9fb3a5",fontSize:14,fontWeight:700}
+                      }, "自責なし（失策などによる失点）")
+                  )
+                : React.createElement('div',{style:{display:"flex",gap:10}}
+                    , React.createElement('button',{
+                        onClick:e=>{e.stopPropagation(); recordOne(inningPit.length===1?inningPit[0].idx:defaultPit);},
+                        style:{flex:1,padding:"14px",borderRadius:10,cursor:"pointer",
+                          background:"#e02d24",border:"none",color:"#fff",fontSize:15,fontWeight:700}
+                      }, "✅ 自責点")
+                    , React.createElement('button',{
+                        onClick:e=>{e.stopPropagation(); recordOne(null);},
+                        style:{flex:1,padding:"14px",borderRadius:10,cursor:"pointer",
+                          background:"#122016",border:"1px solid #2e4234",color:"#9fb3a5",fontSize:15,fontWeight:700}
+                      }, "自責なし")
+                  )
             )
           );
         }
@@ -6029,7 +6179,7 @@ function App() {
                   const autoIpOuts=Math.floor((auto.autoIp||0)/10)*3+((auto.autoIp||0)%10);
                   const effectiveIp=pitcher.manualIp!==undefined?pitcher.manualIp:autoIpOuts;
                   const ipDisp=Math.floor(effectiveIp/3)+"回"+(effectiveIp%3>0?effectiveIp%3+"/3":"");
-                  const er=pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:(auto.autoEr||0);
+                  const er=pitcher.erManual!==undefined?pitcher.erManual:(pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:0);
                   const entryKey=JSON.stringify(entry);
                   return React.createElement('div',{key:li,style:{
                     background:"#122016",border:"1px solid #24402b",borderRadius:10,
@@ -6197,8 +6347,8 @@ function App() {
                         ,"自責点（手動修正）"
                         ,React.createElement('input',{
                             type:"number",min:0,
-                            defaultValue:pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:"",
-                            placeholder:"自動: "+(auto.autoEr||0),
+                            defaultValue:pitcher.erManual!==undefined?pitcher.erManual:(pitcher.manualOverride&&pitcher.er!==undefined?pitcher.er:""),
+                            placeholder:"0",
                             key:"er_"+entry.pitcherIdx+"_"+er,
                             onBlur:e=>{
                               const v=e.target.value.trim();
@@ -6206,15 +6356,15 @@ function App() {
                               mutGame(g=>{
                                 const ps=[...g[side+"Pitchers"]];
                                 if(!ps[pi]) return g;
-                                if(v==="") ps[pi]={...ps[pi],manualOverride:false,er:undefined};
-                                else{const n=parseInt(v);if(!isNaN(n))ps[pi]={...ps[pi],er:n,autoEr:n,manualOverride:true};}
+                                if(v==="") ps[pi]={...ps[pi],erManual:undefined};
+                                else{const n=parseInt(v);if(!isNaN(n))ps[pi]={...ps[pi],erManual:n};}
                                 return {...g,[side+"Pitchers"]:ps};
                               });
                             },
                             style:{background:"#0c160e",border:"1px solid #e02d24",
                               borderRadius:6,color:"#ff7d72",padding:"6px 8px",fontSize:12,width:"100%"}
                           })
-                        ,React.createElement('span',{style:{fontSize:9,color:"#4b6052"}},"空欄で自動計算に戻す")
+                        ,React.createElement('span',{style:{fontSize:9,color:"#4b6052"}},"得点時のモーダルでも記録できます")
                       )
                       ,React.createElement('label',{style:{flex:1,fontSize:11,color:"#a78bfa",display:"flex",flexDirection:"column",gap:4}}
                         ,"投球回補正（+/−アウト）"
@@ -6453,7 +6603,8 @@ function App() {
                       React.createElement('button', {key:mode,
                         onClick:()=>setNewPitchMode(mode),
                         style:{
-                          flex:1, padding:"10px 8px", borderRadius:8, fontSize:12, fontWeight:700, cursor:"pointer",
+                          flex:1, padding:"12px 8px", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer",
+                          whiteSpace:"nowrap", minHeight:48,
                           background: newPitchMode===mode ? (mode==="result"?"#1d4ed8":"#065f46") : "#122016",
                           border: `2px solid ${newPitchMode===mode?(mode==="result"?"#3b82f6":"#10b981"):"#24402b"}`,
                           color: newPitchMode===mode ? "#fff" : "#74897b",
@@ -6461,9 +6612,6 @@ function App() {
                       }
                       , mode==="result" ? "🎯 打席結果のみ" : "⚾ 一球ごと記録"
                     )
-                  )
-                , React.createElement('div', {style:{fontSize:10,color:"#4b6052",marginTop:6,textAlign:"center"}},
-                    newPitchMode==="result" ? "打席結果モーダルが自動で開きます" : "B/S/Fボタンで投球を入力してから打席結果を選択"
                   )
                 )
               )
@@ -7396,7 +7544,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             // 全チーム表示時はチーム名で区別、チーム絞り込み時はそのまま
             const key = filterTeamName ? name : (teamName ? teamName+" "+name : name);
             const dispName = filterTeamName ? name : (teamName ? teamName+" "+name : name);
-            if(!map[key]) map[key]={name:dispName,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,sb:0,cs:0,run:0,sac:0,sf:0,tb:0,e:0,spAb:0,spH:0,games:new Set()};
+            if(!map[key]) map[key]={name:dispName,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,sb:0,cs:0,run:0,sac:0,sf:0,tb:0,e:0,ci:0,spAb:0,spH:0,games:new Set()};
             const m = map[key];
           m.games.add(g.id);
           Object.values(v.atBats||{}).flat().forEach(e=>{
@@ -7410,7 +7558,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             if(c==="H2") m.h2++;
             if(c==="H3") m.h3++;
             if(c==="HR") m.hr++;
-            if(c==="BB"||c==="IBB"||c==="CI") m.bb++;  // 打撃妨害も出塁扱い
+            if(c==="BB"||c==="IBB") m.bb++;  // 四球(IBB含む)。CIは四球ではない
+            if(c==="CI") m.ci=(m.ci||0)+1;   // 打撃妨害は独立カウント
             if(c==="HBP") m.hbp++;
             if(["K","KL","KW"].includes(c)) m.k++;
             if(c==="SAC") m.sac++;
@@ -7428,7 +7577,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
     return Object.values(map).map(m=>{
       const spAvg = m.spAb>0 ? (m.spH/m.spAb).toFixed(3).replace(/^0/,"") : "---";
       m.spAvg = spAvg;
-      const pa = m.ab+m.bb+m.hbp+m.sac+m.sf;
+      const pa = m.ab+m.bb+m.hbp+m.sac+m.sf+(m.ci||0);
       const avg = m.ab>0?(m.h/m.ab).toFixed(3).replace(/^0/,""):".---";
       const slg = m.ab>0?(m.tb/m.ab).toFixed(3).replace(/^0/,""):".---";
       const obp = (m.ab+m.bb+m.hbp+m.sf)>0?((m.h+m.bb+m.hbp)/(m.ab+m.bb+m.hbp+m.sf)).toFixed(3).replace(/^0/,""):".---";
@@ -7482,12 +7631,14 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
           const outsGot = p.manualIp !== undefined ? p.manualIp : autoIpOuts;
           m.outs += outsGot;
           m.h    += p.manualH  !==undefined ? p.manualH   : (a.autoH||0);
-          m.er   += (p.manualOverride && p.er!==undefined) ? p.er : (a.autoEr||0);
+          // 自責点: モーダルで記録したerManualを優先。旧データのer(manualOverride)もフォールバックで考慮
+          m.er   += p.erManual!==undefined ? p.erManual : ((p.manualOverride && p.er!==undefined) ? p.er : 0);
           m.bb   += p.manualBb !==undefined ? p.manualBb  : (a.autoBb||0);
           m.k    += p.manualK  !==undefined ? p.manualK   : (a.autoK||0);
           m.hbp  += p.manualHbp!==undefined ? p.manualHbp : (a.autoHbp||0);
           m.hr   += p.manualHr !==undefined ? p.manualHr  : (a.autoHr||0);
-          m.runs += (p.manualOverride && p.autoRuns!==undefined) ? p.autoRuns : (a.autoRuns||0);
+          // 失点: 機械的に決まるため自動計算(autoRuns)を使用
+          m.runs += (a.autoRuns||0);
           // 勝敗・セーブ・ホールド（同名投手の再登板で重複カウントしないようgame単位で管理）
           const _wKey = g.id+"|"+p.name;
           if(!map[p.name]._seenGames) map[p.name]._seenGames = new Set();
@@ -7610,9 +7761,9 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                       const effectiveAb = getV("ab", p.ab);
                       const effectiveH  = getV("h",  p.h);
                       const effectiveBb = getV("bb", p.bb);
-                      const effectiveHbp = getV("hbp", p._hbp||0);
+                      const effectiveHbp = getV("hbp", p.hbp||0);
                       const effectiveHr = getV("hr", p.hr);
-                      const effectiveSf = p._sf||0;
+                      const effectiveSf = p.sf||0;
                       // 打率 = 安打 / 打数
                       const recalcAvg = effectiveAb>0 ? (effectiveH/effectiveAb).toFixed(3).replace(/^0/,"") : ".---";
                       // 塁打 = 安打 + 二塁打 + 三塁打*2 + 本塁打*3
@@ -7642,11 +7793,11 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
                         ["run",  p.run,            tdS],
                         ["sb",   p.sb,             {...tdS,color:"#54e08c"}],
                         ["bb",   p.bb,             {...tdS,color:"#60a5fa"}],
-                        ["hbp",  p._hbp||0,        {...tdS,color:"#a78bfa"}],
+                        ["hbp",  p.hbp||0,        {...tdS,color:"#a78bfa"}],
                         ["h2",   p.h2||0,          {...tdS,color:"#54e08c"}],
                         ["h3",   p.h3||0,          {...tdS,color:"#54e08c"}],
-                        ["sac",  p._sac||0,         {...tdS,color:"#9fb3a5"}],
-                        ["sf",   p._sf||0,          {...tdS,color:"#9fb3a5"}],
+                        ["sac",  p.sac||0,         {...tdS,color:"#9fb3a5"}],
+                        ["sf",   p.sf||0,          {...tdS,color:"#9fb3a5"}],
                         ["k",    p.k,              {...tdS,color:"#9fb3a5"}],
                         ["e",    p.e||0,           {...tdS,color:p.e>0?"#ff7d72":"#4b6052"}],
                       ];
@@ -7932,7 +8083,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             if(c==="H2") h2++;
             if(c==="H3") h3++;
             if(c==="HR") hr++;
-            if(c==="BB"||c==="IBB"||c==="CI") bb++;
+            if(c==="BB"||c==="IBB") bb++;  // CIは四球ではないため除外
             if(c==="HBP") hbp++;
             if(["K","KL","KW"].includes(c)) k++;
           });
@@ -9695,7 +9846,7 @@ const S = {
   header:{
     background:"linear-gradient(180deg,#0f2040,#0c160e)",
     borderBottom:"1px solid #24402b",
-    padding:"12px 16px 10px",
+    padding:"calc(env(safe-area-inset-top, 0px) + 14px) 16px 10px",
     position:"sticky", top:0, zIndex:90,
   },
   hRow:{
