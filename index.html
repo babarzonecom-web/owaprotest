@@ -3834,7 +3834,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.25")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.26")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3918,7 +3918,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.25")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.26")
         )
 
         // ===== 新規チーム作成 =====
@@ -5252,6 +5252,8 @@ function App() {
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},React.createElement('span',{style:{fontSize:10,color}},game.finished?"先発":"登板中"))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},auto.autoTbf||0)
+                              , (game.pitchMode||"result")==="pitch" && React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},p.pitchCount||0)
+                              , (game.pitchMode||"result")==="pitch" && React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}}, (p.pitchCount>0?Math.round((p.strikeCount||0)/p.pitchCount*100)+"%":"—"))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispH)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispHr)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},dispK)
@@ -5308,6 +5310,8 @@ function App() {
                               )
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},ipDisp)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2,color:"#7dd3fc"}},auto.autoTbf||0)
+                              , (game.pitchMode||"result")==="pitch" && React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},p.pitchCount||0)
+                              , (game.pitchMode||"result")==="pitch" && React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}}, (p.pitchCount>0?Math.round((p.strikeCount||0)/p.pitchCount*100)+"%":"—"))
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoH||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoHr||0)
                               ,React.createElement('td',{style:{...S.td,textAlign:"center",padding:2}},auto.autoK||0)
@@ -7302,7 +7306,7 @@ function App() {
                   onConfirm: (adjBases,scoredNames,adjOuts,adjErrorPos)=>{
                     commitAtBat(modal.team,modal.pidx,modal.inning,
                       modal.pendingCode,modal.pendingDir||null,scoredNames,adjBases,adjOuts,adjErrorPos||modal.errorPos||null,modal.skipPitchAdd||false);
-                    setModal(null);
+                    // commitAtBat内でモーダル制御(自責点モーダル/次打者)を行うため、ここではsetModal(null)しない
                   },
                   onCancel: ()=>setModal(null),}
                 )
