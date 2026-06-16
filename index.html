@@ -2541,23 +2541,29 @@ function App() {
       setModal(null);
       showToast(`チェンジ！ ${_optionalChain([rOf, 'call', _9 => _9(code), 'optionalAccess', _10 => _10.label])||code} 記録`);
     } else {
-      // 得点があれば自責点モーダルを表示
-      if((runs||0) > 0) {
+      // 得点があれば自責点モーダルを表示(次打者モーダルより優先)
+      const hasRuns = (runs||0) > 0;
+      if(hasRuns) {
         const defSide3 = team==="away" ? "home" : "away";
-        setModal({step:"earned_run", defSide:defSide3, runs, inning, scoredNames:scoredNames||[]});
+        // 自責点モーダルに、閉じた後に進む次打者情報を持たせる
+        setModal({step:"earned_run", defSide:defSide3, runs, inning, scoredNames:scoredNames||[],
+                  _nextBatter:{team, pidx:nextPidx, inning}});
       }
       showToast(`${_optionalChain([rOf, 'call', _11 => _11(code), 'optionalAccess', _12 => _12.label])||code}${(runs||0)>0?` +${runs}点`:""} ✅`);
       
       // pitchModeはgameから直接取得（クロージャの古い値を避けるため）
       const currentPitchMode = document.body.getAttribute("data-pitch-mode") || "result";
-      setTimeout(()=>{
-        // 結果入力モードのみ次の打者を自動表示（1球モードは自動表示しない）
-        if(currentPitchMode === "result") {
-          setModal({team, pidx:nextPidx, inning, step:"result"});
-        } else {
-          setModal(null);
-        }
-      }, 350);
+      // 得点がある場合は自責点モーダルを優先するため、次打者の自動表示はしない
+      if(!hasRuns){
+        setTimeout(()=>{
+          // 結果入力モードのみ次の打者を自動表示（1球モードは自動表示しない）
+          if(currentPitchMode === "result") {
+            setModal({team, pidx:nextPidx, inning, step:"result"});
+          } else {
+            setModal(null);
+          }
+        }, 350);
+      }
     }
   },[mutGame]);
 
@@ -3828,7 +3834,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.24")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.25")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3912,7 +3918,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.24")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.25")
         )
 
         // ===== 新規チーム作成 =====
@@ -5983,7 +5989,14 @@ function App() {
             if(erIndex+1 < totalRunners){
               setModal(m=>({...m, erIndex:erIndex+1, selPitIdx:undefined}));
             } else {
-              setModal(null);
+              // 全走者の自責点を聞き終わった → 次打者モーダルへ進む(結果入力モードのみ)
+              const nb = modal._nextBatter;
+              const pm = document.body.getAttribute("data-pitch-mode") || "result";
+              if(nb && pm==="result"){
+                setModal({team:nb.team, pidx:nb.pidx, inning:nb.inning, step:"result"});
+              } else {
+                setModal(null);
+              }
             }
           };
 
