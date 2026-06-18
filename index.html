@@ -1492,8 +1492,19 @@ const computePitcherStats = (g) => {
       return bestIdx;
     };
 
+    // 打席を担当した投手を特定する。
+    // entry.pLogIdx（記録時に直接書き込まれた登板エントリ番号）があれば最優先で使う＝推測不要で100%正確。
+    // 旧データ（pLogIdxがない過去の試合）はseq推測にフォールバックする。
+    const resolveActivePitcher = (ab) => {
+      const pli = ab.entry && ab.entry.pLogIdx;
+      if(pli !== undefined && pli !== null && log[pli]) {
+        return log[pli].pitcherIdx;
+      }
+      return findActivePitcher(ab.seq);
+    };
+
     allAtBats.forEach(ab=>{
-      let activePIdx = findActivePitcher(ab.seq);
+      let activePIdx = resolveActivePitcher(ab);
 
       const ps = stats[activePIdx];
       if(!ps) return;
@@ -1515,8 +1526,8 @@ const computePitcherStats = (g) => {
     
     
     allAtBats.forEach(ab=>{
-      // findActivePitcherを使って統一（被安打・三振等と同じロジック）
-      const activePIdx = findActivePitcher(ab.seq);
+      // resolveActivePitcherを使って統一（pLogIdxがあれば直接参照、なければ被安打・三振等と同じロジック）
+      const activePIdx = resolveActivePitcher(ab);
       const ps = stats[activePIdx];
       if(!ps) return;
       const code = ab.entry.code;
@@ -2401,6 +2412,10 @@ function App() {
       // 得点圏打率計算のため打席前のランナー状態をentryに追加
       const _preB = g.bases||[null,null,null];
       if(_preB[1]||_preB[2]) entry.sp = true;
+      // この打席を担当した投手の登板(pitcherLogの何番目のエントリか)を直接記録する。
+      // 後からseq推測で「誰が投げたか」を逆算する必要がなくなり、再登板でもズレない。
+      const _defTeamForP = team==="away"?"home":"away";
+      entry.pLogIdx = Math.max(0, (g[_defTeamForP+"PitcherLog"]||[]).length - 1);
       const lk=team+"Lineup";
       const rbiAdd = (RBI_CODES.has(code) && (runs||0)>0) ? (runs||0) : 0;
       const lineup=g[lk].map((p,i)=>{
@@ -2569,12 +2584,15 @@ function App() {
 
   
   const overwriteEntry = useCallback((team,pidx,inning,eidx,code,dir,runs)=>{
-    const entry={code,...(dir?{dir}:{}),runs:runs||0};
     mutGame(g=>{
       const lk=team+"Lineup";
       const lineup=g[lk].map((p,i)=>{
         if(i!==pidx) return p;
-        const list=[...toList(p.atBats,inning)]; list[eidx]=entry;
+        const list=[...toList(p.atBats,inning)];
+        const oldEntry = list[eidx]; // 修正前のentry。pLogIdx(誰が投げたか)を引き継ぐため保持する
+        const entry={code,...(dir?{dir}:{}),runs:runs||0,
+          ...(oldEntry&&oldEntry.pLogIdx!==undefined?{pLogIdx:oldEntry.pLogIdx}:{})};
+        list[eidx]=entry;
         return {...p,atBats:{...p.atBats,[inning]:list}};
       });
       const tmp={...g,[lk]:lineup};
@@ -2612,6 +2630,8 @@ function App() {
   const recordSB = useCallback((team, moves, type, primaryPidx)=>{
     const isOutType = type==="CS" || type==="PO" || type==="RO";
     const isSB      = type==="SB";
+    let _scoredForEr = [];  // 得点した走者(自責点モーダル用にmutGameの外で保持)
+    let _erInning = game.inning;
 
     mutGame(g=>{
       const lk = team+"Lineup";
@@ -2662,6 +2682,8 @@ function App() {
       lineup = lineup.map(p=>
         scoredRunners.includes(p.name) ? {...p, run:(p.run||0)+1} : p
       );
+      _scoredForEr = [...scoredRunners];  // 自責点モーダル用に保持
+      _erInning = g.inning;
 
       // アウトカウント（isOutのmoveの数だけ増やす）
       const outsAdded = moves.filter(m=>m.isOut).length;
@@ -2709,7 +2731,6 @@ function App() {
         baserunnerOuts:brOuts,
         log};
     });
-    setModal(null);
     // チェンジになった場合のみストライク・ボールカウントをリセット（球数は保持）
     const outsAfter = (game.outs||0) + moves.filter(m=>m.isOut).length;
     if(outsAfter >= 3) {
@@ -2722,17 +2743,28 @@ function App() {
       OBI:"走塁妨害・進塁✅", ADV:"進塁✅",
     }[type]||type;
     showToast(toastMsg);
+    // 得点があれば自責点モーダルを表示(走塁による得点)
+    if(_scoredForEr.length > 0){
+      const defSide = team==="away" ? "home" : "away";
+      setModal({step:"earned_run", defSide, runs:_scoredForEr.length, inning:_erInning, scoredNames:_scoredForEr});
+    } else {
+      setModal(null);
+    }
   },[mutGame]);
 
   
   const recordSpecialPlay = useCallback((team, code, advanceBases, runs)=>{
     const sp = SPECIAL_PLAYS.find(p=>p.code===code);
+    let _scoredSP = [];
+    let _innSP = game.inning;
     mutGame(g=>{
       const _gb2 = Array.isArray(g.bases) ? g.bases : [0,1,2].map(i => (g.bases&&g.bases[i]!=null)?g.bases[i]:null);
       const newBases = advanceBases !== undefined ? advanceBases : _gb2;
       // 得点したランナー名を特定（元の塁から消えて新basesにもいない選手）
       const oldBases = _gb2;
       const scoredRunners = (oldBases).filter(n => n && !(newBases||[]).includes(n));
+      _scoredSP = [...scoredRunners];
+      _innSP = g.inning;
       const updatedLineup = g[team+"Lineup"].map(p => {
         if(scoredRunners.includes(p.name)) return {...p, run:(p.run||0)+1};
         return p;
@@ -2753,8 +2785,17 @@ function App() {
         log,
       };
     });
-    setModal(null);
     showToast(`${_optionalChain([sp, 'optionalAccess', _17 => _17.label])||code}記録`);
+    // 得点があれば自責点モーダルを表示
+    const erRuns = (runs||0) > 0 ? runs : _scoredSP.length;
+    if(erRuns > 0){
+      const defSide = team==="away" ? "home" : "away";
+      // scoredNamesが取れていればそれを使い、なければ得点数ぶんの匿名走者
+      const names = _scoredSP.length>0 ? _scoredSP : Array.from({length:erRuns},(_,i)=>"走者"+(i+1));
+      setModal({step:"earned_run", defSide, runs:erRuns, inning:_innSP, scoredNames:names});
+    } else {
+      setModal(null);
+    }
   },[mutGame]);
 
   
@@ -3834,7 +3875,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.26")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.29")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3918,7 +3959,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.26")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.29")
         )
 
         // ===== 新規チーム作成 =====
@@ -6005,9 +6046,9 @@ function App() {
           };
 
           return React.createElement('div',{style:{position:"fixed",inset:0,background:"#000a",zIndex:300,
-              display:"flex",alignItems:"flex-end",justifyContent:"center"}, onClick:()=>setModal(null)}
-            , React.createElement('div',{style:{background:"#122016",borderRadius:"14px 14px 0 0",
-                width:"100%",maxWidth:500,padding:"20px 20px 36px"},onClick:e=>e.stopPropagation()}
+              display:"flex",alignItems:"center",justifyContent:"center",padding:20}, onClick:()=>setModal(null)}
+            , React.createElement('div',{style:{background:"#122016",borderRadius:16,
+                width:"100%",maxWidth:440,padding:"22px 20px",boxShadow:"0 12px 40px rgba(0,0,0,0.5)"},onClick:e=>e.stopPropagation()}
               // 進捗表示(複数走者のとき)
               , totalRunners>1 && React.createElement('div',{style:{fontSize:11,color:"#74897b",marginBottom:6,textAlign:"right"}},
                   (erIndex+1)+" / "+totalRunners+"人目")
