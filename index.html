@@ -3892,7 +3892,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.34")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.35")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3976,7 +3976,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.34")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.35")
         )
 
         // ===== 新規チーム作成 =====
@@ -5460,7 +5460,7 @@ function App() {
               )
               , [
                   {
-                    ver: "v472.34",
+                    ver: "v472.35",
                     date: "2026/06/20",
                     items: [
                       "新試合ウィザードでビジター・ホームが同じチームになるバグを修正",
@@ -5677,24 +5677,55 @@ function App() {
                 setTab("teams");
                 const lineupRaw = g.awayTeam===oppName ? g.awayLineup : g.homeLineup;
                 const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
-                const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
-                if(members.length===0){ showToast("メンバーが見つかりません"); return; }
-                const oppObj = {id:Date.now().toString(36), name:oppName, members};
-                setStorage(s=>{
-                  // 常に新規追加（同名チームでも別エントリとして追加）
-                  const next = {...s, opponents: [...(s.opponents||[]), oppObj]};
-                  showToast("✅ 対戦相手「"+oppName+"」を登録しました");
-                  return next;
+                // スタメン＋交代で出場した全選手を収集
+                const allMembers = [];
+                const seenNames = new Set();
+                const addMember = (name, pos) => {
+                  if(!name || name.startsWith("選手") || seenNames.has(name)) return;
+                  seenNames.add(name);
+                  allMembers.push({name, pos:pos||""});
+                };
+                lineup.forEach(p=>{
+                  if(!p) return;
+                  // _subOuts（交代前の選手たち）を先に追加
+                  const legacySub = (p._subOut&&!p._subOuts)?[p._subOut]:[];
+                  [...legacySub,...(p._subOuts||[])].forEach(so=>addMember(so.name, so.pos));
+                  // 現在の選手
+                  addMember(p.name, p.pos);
                 });
+                if(allMembers.length===0){ showToast("メンバーが見つかりません"); return; }
+                // 既存の同名チームがあればメンバーをマージ、なければ新規
+                const existingOpp = (storage.opponents||[]).find(t=>t.name===oppName);
+                if(existingOpp){
+                  const existNames = new Set((existingOpp.members||[]).map(m=>typeof m==="string"?m:(m.name||"")));
+                  const merged = [...(existingOpp.members||[]),...allMembers.filter(m=>!existNames.has(m.name))];
+                  saveOpponent({...existingOpp, members:merged});
+                } else {
+                  saveOpponent({name:oppName, members:allMembers});
+                }
+                showToast("✅ 対戦相手「"+oppName+"」を登録しました（"+allMembers.length+"名）");
               },
               onRestoreTeam:(g, myTeamSide)=>{
                 setTab("teams");
                 const makeTeamObj = (teamName, lineupRaw) => {
                   if(!teamName||teamName==="ビジターチーム"||teamName==="ホームチーム") return null;
                   const lineup = Array.isArray(lineupRaw)?lineupRaw:(lineupRaw?Object.values(lineupRaw):[]);
-                  const members = lineup.filter(p=>p.name&&!p.name.startsWith("選手")).map(p=>({name:p.name,pos:p.pos||""}));
-                  if(members.length===0) return null;
-                  return {id:Date.now().toString(36), name:teamName, members};
+                  // スタメン＋交代で出場した全選手を収集
+                  const allMems = [];
+                  const seenN = new Set();
+                  const addM = (name, pos) => {
+                    if(!name||name.startsWith("選手")||seenN.has(name)) return;
+                    seenN.add(name);
+                    allMems.push({name, pos:pos||""});
+                  };
+                  lineup.forEach(p=>{
+                    if(!p) return;
+                    const leg = (p._subOut&&!p._subOuts)?[p._subOut]:[];
+                    [...leg,...(p._subOuts||[])].forEach(so=>addM(so.name,so.pos));
+                    addM(p.name, p.pos);
+                  });
+                  if(allMems.length===0) return null;
+                  return {id:Date.now().toString(36), name:teamName, members:allMems};
                 };
                 const myObj  = makeTeamObj(g[myTeamSide+"Team"], g[myTeamSide+"Lineup"]);
                 const oppSide = myTeamSide==="away"?"home":"away";
