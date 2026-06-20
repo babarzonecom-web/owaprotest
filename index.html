@@ -2183,19 +2183,18 @@ function App() {
     setNewTeamPw("");
     setNewAdminPw("");
 
-    // ゲームデータをリセット
+    // ゲームデータをリセット（チームデータは保持する）
     const freshGame = newGame();
-    setStorage({
+    setStorage(s=>({
+      ...s,
       currentGame: freshGame,
       history: [],
       undoStack: [],
-      teams: [],
-      myTeam: null,
-      opponents: [],
-    });
+      // teams/myTeam/opponentsは保持(メンバー登録データが消えないように)
+    }));
 
     setTab("login");
-    showToast("ログアウトしました。データをクリアしました。");
+    showToast("ログアウトしました。");
   };
 
   // 自動再接続は削除（手動接続のみ）
@@ -2887,7 +2886,18 @@ function App() {
     const ac = team.adminCode || Math.random().toString(36).slice(2,8).toUpperCase();
     const teamWithId = team.id ? {...team, adminCode:ac} : {...team, id:makeTeamId(), adminCode:ac};
     fbSaveTeam(teamWithId);
-    setStorage(s => ({...s, myTeam: teamWithId}));
+    setStorage(s => {
+      const next = {...s, myTeam: teamWithId};
+      // teamData/{code}にも自動保存(ログアウト後も復元できるように)
+      const code = localStorage.getItem("tsCode");
+      if(code){
+        const data = {teams:s.teams||[], myTeam:teamWithId, opponents:s.opponents||[], savedAt:new Date().toISOString()};
+        fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+code+".json",
+          {method:"PUT", body:JSON.stringify(data)})
+          .catch(e=>console.log("[FB] teamData auto-save error:", e));
+      }
+      return next;
+    });
     showToast(`自チーム「${teamWithId.name}」を保存しました`);
     return teamWithId;
   };
@@ -2900,6 +2910,14 @@ function App() {
       const opponents = existing>=0
         ? s.opponents.map(t=>t.id===teamWithId.id?teamWithId:t)
         : [...(s.opponents||[]), teamWithId];
+      // teamData/{code}にも自動保存
+      const code = localStorage.getItem("tsCode");
+      if(code){
+        const data = {teams:s.teams||[], myTeam:s.myTeam||null, opponents, savedAt:new Date().toISOString()};
+        fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/teamData/"+code+".json",
+          {method:"PUT", body:JSON.stringify(data)})
+          .catch(e=>console.log("[FB] teamData auto-save error:", e));
+      }
       return {...s, opponents};
     });
     showToast(`「${teamWithId.name}」を保存しました`);
@@ -3875,7 +3893,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.29")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.30")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3959,7 +3977,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.29")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.30")
         )
 
         // ===== 新規チーム作成 =====
@@ -4567,21 +4585,75 @@ function App() {
 
                 , tab==="score"&&(React.createElement(React.Fragment, null
 
-          // 未開始状態: 「記録を始める」画面
+          // 未開始状態: ステップ式の直感的な動線
           , (game.started === false) ? (
-            React.createElement('div', {style:{...S.card, textAlign:"center", padding:"40px 20px"}}
-              , React.createElement('div', {style:{fontSize:48, marginBottom:16}}, "⚾")
-              , React.createElement('div', {style:{fontSize:20, fontWeight:900, color:"#e9f0ea", marginBottom:8}},
-                "おわプロスコア")
-              , React.createElement('div', {style:{fontSize:13, color:"#4b6052", marginBottom:32, lineHeight:1.6}},
-                "試合を記録して成績を管理しましょう。\nチーム同期で複数端末からリアルタイム共有できます。")
-              , React.createElement('button', {
-                  onClick:()=>setModal({step:"confirm_new", fromWelcome:true}),
-                  style:{...sBt("#18b257"), fontSize:16, padding:"14px 32px", marginBottom:16,
-                    borderRadius:12, fontWeight:900, width:"100%", maxWidth:280}
-                }, "⚾ 記録を始める")
-              , (myTeam||opponents.length>0) && React.createElement('div', {style:{fontSize:12, color:"#4b6052", marginTop:4}},
-                "チームタブでチームを選択するとスムーズに開始できます")
+            React.createElement('div', {style:{padding:"8px 0"}}
+              // ステップ1: 記録を始める
+              , React.createElement('div', {style:{...S.card, marginBottom:12}}
+                , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:12,
+                    marginBottom:(game.awayTeam&&game.homeTeam)?0:12}}
+                  , React.createElement('div', {style:{width:32,height:32,borderRadius:"50%",background:"#18b257",
+                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,flexShrink:0}}, "1")
+                  , React.createElement('div', null
+                    , React.createElement('div', {style:{fontSize:14,fontWeight:700,color:"#e9f0ea"}}, "試合情報を設定する")
+                    , (game.awayTeam&&game.homeTeam)
+                      ? React.createElement('div', {style:{fontSize:11,color:"#54e08c",marginTop:2}},
+                          "✅ "+game.awayTeam+" vs "+game.homeTeam+(game.date?" ("+game.date+")":""))
+                      : React.createElement('div', {style:{fontSize:11,color:"#74897b",marginTop:2}}, "チーム名・日付・球場を入力")
+                  )
+                )
+                , !(game.awayTeam&&game.homeTeam) && React.createElement('button', {
+                    onClick:()=>setModal({step:"confirm_new", fromWelcome:true}),
+                    style:{...sBt("#18b257"), width:"100%", fontSize:15, padding:"12px", borderRadius:10, fontWeight:900}
+                  }, "⚾ 記録を始める / 新試合")
+              )
+              // ステップ2: オーダー登録
+              , React.createElement('div', {style:{...S.card, marginBottom:12,
+                  opacity:(game.awayTeam||game.homeTeam)?1:0.5}}
+                , React.createElement('div', {style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}
+                  , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:12}}
+                    , React.createElement('div', {style:{width:32,height:32,borderRadius:"50%",
+                        background:(game.awayLineup||[]).some(p=>p.name&&!p.name.startsWith("選手"))?"#18b257":"#2e4234",
+                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,flexShrink:0}}, "2")
+                    , React.createElement('div', null
+                      , React.createElement('div', {style:{fontSize:14,fontWeight:700,color:"#e9f0ea"}}, "オーダーを登録する")
+                      , (game.awayLineup||[]).some(p=>p.name&&!p.name.startsWith("選手"))
+                        ? React.createElement('div', {style:{fontSize:11,color:"#54e08c",marginTop:2}},
+                            "✅ "+(game.awayLineup||[]).filter(p=>p.name&&!p.name.startsWith("選手")).length+"名登録済み")
+                        : React.createElement('div', {style:{fontSize:11,color:"#74897b",marginTop:2}}, "打順・選手名を入力")
+                    )
+                  )
+                  , React.createElement('button', {
+                      onClick:()=>setTab("lineup"),
+                      disabled:!(game.awayTeam||game.homeTeam),
+                      style:{...sBt("#0369a1"),fontSize:13,padding:"8px 16px",borderRadius:8,fontWeight:700,flexShrink:0}
+                    }, "オーダー →")
+                )
+              )
+              // ステップ3: 記録開始
+              , React.createElement('div', {style:{...S.card,
+                  opacity:(game.awayLineup||[]).some(p=>p.name&&!p.name.startsWith("選手"))?1:0.5}}
+                , React.createElement('div', {style:{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}
+                  , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:12}}
+                    , React.createElement('div', {style:{width:32,height:32,borderRadius:"50%",background:"#e02d24",
+                        display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,flexShrink:0}}, "3")
+                    , React.createElement('div', null
+                      , React.createElement('div', {style:{fontSize:14,fontWeight:700,color:"#e9f0ea"}}, "記録開始")
+                      , React.createElement('div', {style:{fontSize:11,color:"#74897b",marginTop:2}}, "打席の記録を開始します")
+                    )
+                  )
+                  , React.createElement('button', {
+                      onClick:()=>{
+                        if(!(game.awayLineup||[]).some(p=>p.name&&!p.name.startsWith("選手"))){
+                          showToast("先にオーダーを登録してください"); return;
+                        }
+                        mutGame(g=>({...g, started:true}));
+                      },
+                      disabled:!(game.awayLineup||[]).some(p=>p.name&&!p.name.startsWith("選手")),
+                      style:{...sBt("#e02d24"),fontSize:13,padding:"8px 16px",borderRadius:8,fontWeight:700,flexShrink:0}
+                    }, "記録開始 →")
+                )
+              )
             )
           ) : (
           React.createElement(React.Fragment, null
