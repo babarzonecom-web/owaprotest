@@ -3892,7 +3892,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.35")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.36")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3976,7 +3976,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.35")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.36")
         )
 
         // ===== 新規チーム作成 =====
@@ -4584,8 +4584,8 @@ function App() {
 
                 , tab==="score"&&(React.createElement(React.Fragment, null
 
-          // 未開始状態: ステップ式の直感的な動線
-          , (game.started === false || game.finished === true) ? (
+          // 未開始状態: ステップ式の直感的な動線（started===falseのみ。finished試合はスコアボード表示）
+          , (game.started === false) ? (
             React.createElement('div', {style:{padding:"24px 8px", textAlign:"center"}}
               , React.createElement('div', {style:{fontSize:48, marginBottom:12}}, "⚾")
               , React.createElement('div', {style:{fontSize:20,fontWeight:900,color:"#e9f0ea",marginBottom:24}},
@@ -5460,7 +5460,7 @@ function App() {
               )
               , [
                   {
-                    ver: "v472.35",
+                    ver: "v472.36",
                     date: "2026/06/20",
                     items: [
                       "新試合ウィザードでビジター・ホームが同じチームになるバグを修正",
