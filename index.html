@@ -3892,7 +3892,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.36")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.37")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -3976,7 +3976,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.36")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.37")
         )
 
         // ===== 新規チーム作成 =====
@@ -5460,7 +5460,7 @@ function App() {
               )
               , [
                   {
-                    ver: "v472.36",
+                    ver: "v472.37",
                     date: "2026/06/20",
                     items: [
                       "新試合ウィザードでビジター・ホームが同じチームになるバグを修正",
@@ -9225,6 +9225,19 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
   const [activeSlot, setActiveSlot] = useState(null);
   const [slotCount, setSlotCount] = useState(9);
   const [selPitcher, setSelPitcher] = useState("");
+  // side/preselectが変わったら（away→homeへの自動遷移時）stateをリセット
+  const prevSideRef = React.useRef(side);
+  React.useEffect(()=>{
+    if(prevSideRef.current !== side) {
+      prevSideRef.current = side;
+      const next = preselect || (teams.length===1 ? teams[0] : null);
+      setSelTeam(next);
+      setAssignments({});
+      setActiveSlot(null);
+      setSlotCount(9);
+      setSelPitcher("");
+    }
+  }, [side, preselect]);
   const POS_LIST = ["投","捕","一","二","三","遊","左","中","右","指"];
 
   const members = (selTeam && selTeam.members) || [];
