@@ -3948,7 +3948,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.56")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.57")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4032,7 +4032,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.56")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.57")
         )
 
         // ===== 新規チーム作成 =====
@@ -4270,7 +4270,8 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
+                  {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
+                  {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
                   {ver:"v472.52",date:"2026/06/23",items:["ゲッツー（DP）で打点がつくバグを修正","犠打・犠飛のチーム合計が0になるバグを修正"]},
                   {ver:"v472.51",date:"2026/06/23",items:["大会・対戦相手データがアップデートで消えるバグを修正"]},
@@ -5606,7 +5607,8 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
+                  {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
+                  {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
                   {ver:"v472.52",date:"2026/06/23",items:["ゲッツー（DP）で打点がつくバグを修正","犠打・犠飛のチーム合計が0になるバグを修正"]},
                   {ver:"v472.51",date:"2026/06/23",items:["大会・対戦相手データがアップデートで消えるバグを修正"]},
@@ -7702,8 +7704,21 @@ function ShareCardModal(props) {
   var posLabel = posState[0]; var setPosLabel = posState[1];
   var capState = useState(false);
   var capturing = capState[0]; var setCapturing = capState[1];
+  var photoState = useState(null);
+  var photoUrl = photoState[0]; var setPhotoUrl = photoState[1];
+  var noPhotoState = useState(false);
+  var noPhoto = noPhotoState[0]; var setNoPhoto = noPhotoState[1];
 
   var cardRef = React.useRef(null);
+  var fileInputRef = React.useRef(null);
+
+  function handleFileChange(e) {
+    var file = e.target.files && e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){ setPhotoUrl(ev.target.result); };
+    reader.readAsDataURL(file);
+  }
 
   // 試合スコア計算
   var awayScore = 0; var homeScore = 0;
@@ -7723,14 +7738,16 @@ function ShareCardModal(props) {
   var allGames = history.filter(function(g){return g&&g.awayLineup&&g.homeLineup&&g.finished;});
   var playerStats = null;
   if(selPlayer && mode==="player_bat" && allGames.length>0) {
-    var pa=0,ab=0,h=0,hr=0,rbi=0,bb=0,k=0,sb=0,h2=0,h3=0,sac=0,sf=0,hbp=0,ci=0,run=0;
+    var pa=0,ab=0,h=0,hr=0,rbi=0,bb=0,k=0,sb=0,h2=0,h3=0,sac=0,sf=0,hbp=0,ci=0,run=0,gPlayed=0;
     allGames.forEach(function(fg){
+      var appearedInGame=false;
       ["away","home"].forEach(function(side){
         var lu=fg[side+"Lineup"]||[];
         lu.forEach(function(p){
           var allP=[p].concat(p._subOuts||[]);
           allP.forEach(function(pp){
             if(!pp||pp.name!==selPlayer.name) return;
+            appearedInGame=true;
             Object.values(pp.atBats||{}).forEach(function(inningAbs){
               var abs=Array.isArray(inningAbs)?inningAbs:[inningAbs];
               abs.forEach(function(ab_){
@@ -7751,6 +7768,7 @@ function ShareCardModal(props) {
           });
         });
       });
+      if(appearedInGame) gPlayed++;
     });
     var avg=ab>0?(h/ab).toFixed(3).replace("0.","."):".000";
     var tb=(h-h2-h3-hr)+h2*2+h3*3+hr*4;
@@ -7758,18 +7776,20 @@ function ShareCardModal(props) {
     var obpD=pa-sac-ci;
     var obp=obpD>0?((h+bb+hbp)/obpD).toFixed(3).replace("0.","."):".000";
     var ops=obpD>0?(parseFloat(obp)+parseFloat(slg)).toFixed(3).replace("0.","."):".000";
-    playerStats={pa:pa,ab:ab,h:h,hr:hr,rbi:rbi,bb:bb,k:k,sb:sb,avg:avg,slg:slg,obp:obp,ops:ops,g:allGames.length};
+    playerStats={pa:pa,ab:ab,h:h,hr:hr,rbi:rbi,bb:bb,k:k,sb:sb,avg:avg,slg:slg,obp:obp,ops:ops,g:gPlayed};
   }
 
   // 画像保存
   function capture() {
     if(!cardRef.current||capturing) return;
     setCapturing(true);
-    html2canvas(cardRef.current,{scale:3,useCORS:true,backgroundColor:"#000",logging:false})
+    html2canvas(cardRef.current,{scale:3,useCORS:true,backgroundColor:"#000",logging:false,
+      allowTaint:true,imageTimeout:0})
       .then(function(canvas){
-        var url=canvas.toDataURL("image/png");
+        // JPEGで出力（スマホ写真フォルダに保存しやすい形式）
+        var url=canvas.toDataURL("image/jpeg",0.95);
         var a=document.createElement("a");
-        a.href=url; a.download="owapro_card.png"; a.click();
+        a.href=url; a.download="owapro_card.jpg"; a.click();
         setCapturing(false);
       }).catch(function(e){alert("保存失敗: "+e.message); setCapturing(false);});
   }
@@ -7809,12 +7829,26 @@ function ShareCardModal(props) {
     var sc=stampColors[stamp]||GOLD;
     var awLU=(game&&game.awayLineup)||[];
     var hmLU=(game&&game.homeLineup)||[];
+    var tournament=(game&&game.tournament)||"";
+    var bannerText="⚾ FINAL SCORE"+(game&&game.date?" — "+game.date:"")+(game&&game.place?" @ "+game.place:"");
+    if(tournament) bannerText=tournament+" | "+bannerText;
     return React.createElement("div",{ref:cardRef,style:Object.assign({},sCard,{
       background:"radial-gradient(ellipse at 50% 60%,#050a18 0%,#000208 60%,#000 100%)"})}
       ,React.createElement("div",{style:sBanner}
-        ,React.createElement("div",{style:{fontFamily:"'Oswald',sans-serif",fontSize:8,fontWeight:700,color:"#000",letterSpacing:2}}
-          ,"⚾ FINAL SCORE"+(game&&game.date?" — "+game.date:"")+(game&&game.place?" @ "+game.place:""))
-        ,React.createElement("div",{style:{fontFamily:"'Noto Sans JP',sans-serif",fontSize:7,fontWeight:900,color:"#3a2000"}},"簡単！みんなの野球記録")
+        ,React.createElement("div",{style:{fontFamily:"'Oswald',sans-serif",fontSize:8,fontWeight:700,color:"#000",letterSpacing:1}},bannerText)
+        ,React.createElement("div",{style:{fontFamily:"'Noto Sans JP',sans-serif",fontSize:7,fontWeight:900,color:"#3a2000",flexShrink:0,marginLeft:4}},"簡単！みんなの野球記録")
+      )
+      // 写真エリア（cardType==="C"の場合）
+      ,cardType==="C"&&React.createElement("div",{style:{height:160,overflow:"hidden",position:"relative",
+        background:"#050510",display:"flex",alignItems:"center",justifyContent:"center",
+        borderBottom:"2px solid "+GOLD}}
+        ,photoUrl
+          ?React.createElement("img",{src:photoUrl,style:{width:"100%",height:"100%",objectFit:"cover"}})
+          :React.createElement("div",{style:{color:"#222",fontFamily:"'Bebas Neue',sans-serif",fontSize:10,letterSpacing:3}},"PHOTO")
+        ,React.createElement("div",{style:{position:"absolute",top:5,left:5,width:13,height:13,borderTop:"2px solid "+GOLD,borderLeft:"2px solid "+GOLD}})
+        ,React.createElement("div",{style:{position:"absolute",top:5,right:5,width:13,height:13,borderTop:"2px solid "+GOLD,borderRight:"2px solid "+GOLD}})
+        ,React.createElement("div",{style:{position:"absolute",bottom:5,left:5,width:13,height:13,borderBottom:"2px solid "+GOLD,borderLeft:"2px solid "+GOLD}})
+        ,React.createElement("div",{style:{position:"absolute",bottom:5,right:5,width:13,height:13,borderBottom:"2px solid "+GOLD,borderRight:"2px solid "+GOLD}})
       )
       ,React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 12px 5px",gap:4}}
         ,React.createElement("div",{style:{flex:1,fontSize:14,fontWeight:900,color:GOLD}},game&&game.awayTeam)
@@ -7899,16 +7933,18 @@ function ShareCardModal(props) {
         ,React.createElement("div",{style:{fontFamily:"'Oswald',sans-serif",fontSize:8,fontWeight:700,color:bannerTextCol,letterSpacing:2}},"⚾ SEASON STATS")
         ,React.createElement("div",{style:{fontFamily:"'Noto Sans JP',sans-serif",fontSize:7,fontWeight:900,color:bannerTextCol}},"簡単！みんなの野球記録")
       )
-      ,React.createElement("div",{style:{display:"flex",height:138,position:"relative",zIndex:2}}
-        ,React.createElement("div",{style:{width:110,flexShrink:0,
+      ,React.createElement("div",{style:{display:"flex",height:noPhoto?100:138,position:"relative",zIndex:2}}
+        ,!noPhoto&&React.createElement("div",{style:{width:110,flexShrink:0,
           background:"linear-gradient(160deg,#0d0d1a,#14080a,#080a14)",
           display:"flex",alignItems:"center",justifyContent:"center",
           borderRight:"2px solid "+ac,position:"relative",overflow:"hidden"}}
+          ,photoUrl
+            ?React.createElement("img",{src:photoUrl,style:{width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top"}})
+            :React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:9,color:"#1e1e1e",letterSpacing:2}},"PHOTO")
           ,React.createElement("div",{style:{position:"absolute",top:5,left:5,width:13,height:13,borderTop:"2px solid "+ac,borderLeft:"2px solid "+ac}})
           ,React.createElement("div",{style:{position:"absolute",top:5,right:5,width:13,height:13,borderTop:"2px solid "+ac,borderRight:"2px solid "+ac}})
           ,React.createElement("div",{style:{position:"absolute",bottom:5,left:5,width:13,height:13,borderBottom:"2px solid "+ac,borderLeft:"2px solid "+ac}})
           ,React.createElement("div",{style:{position:"absolute",bottom:5,right:5,width:13,height:13,borderBottom:"2px solid "+ac,borderRight:"2px solid "+ac}})
-          ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:9,color:"#1e1e1e",letterSpacing:2}},"PHOTO")
         )
         ,React.createElement("div",{style:{flex:1,minWidth:0,display:"flex",flexDirection:"column",
           justifyContent:"center",padding:"10px 10px 10px 12px",
@@ -7974,13 +8010,22 @@ function ShareCardModal(props) {
     )
     ,mode==="game"&&React.createElement(React.Fragment,null
       ,React.createElement("div",{style:{display:"flex",gap:6,marginBottom:8,width:"100%",maxWidth:380,alignItems:"center"}}
-        ,React.createElement("div",{style:{fontSize:11,color:"#74897b"}},"スタメン")
-        ,["A","B"].map(function(t){
+        ,React.createElement("div",{style:{fontSize:11,color:"#74897b"}},"スタイル")
+        ,["A","B","C"].map(function(t){
+          var lbl=t==="A"?"スタメンあり":t==="B"?"スタメンなし":"写真あり";
           return React.createElement("button",{key:t,onClick:function(){setCardType(t);},
-            style:{flex:1,padding:"6px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
-              background:cardType===t?"#1a56a0":"#0c160e",color:cardType===t?"#fff":"#4b6052"}},
-            t==="A"?"あり":"なし");
+            style:{flex:1,padding:"6px",borderRadius:6,border:"none",cursor:"pointer",fontSize:10,fontWeight:700,
+              background:cardType===t?"#1a56a0":"#0c160e",color:cardType===t?"#fff":"#4b6052"}},lbl);
         })
+      )
+      ,cardType==="C"&&React.createElement("div",{style:{width:"100%",maxWidth:380,marginBottom:8}}
+        ,React.createElement("button",{
+          onClick:function(){fileInputRef.current&&fileInputRef.current.click();},
+          style:{width:"100%",padding:"10px",borderRadius:8,border:"1px dashed #555",
+            background:"#0c160e",color:photoUrl?"#18b257":"#74897b",fontSize:12,cursor:"pointer",fontWeight:700}}
+          ,photoUrl?"✅ 写真選択済み（タップで変更）":"📷 写真を選ぶ")
+        ,React.createElement("input",{ref:fileInputRef,type:"file",accept:"image/*",
+          style:{display:"none"},onChange:handleFileChange})
       )
       ,React.createElement("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginBottom:12,width:"100%",maxWidth:380}}
         ,["VICTORY","WIN!!","LOSE...","DRAW","VICTORY!!!!!"].map(function(s){
@@ -8003,7 +8048,7 @@ function ShareCardModal(props) {
           })
         )
       )
-      ,React.createElement("div",{style:{width:"100%",maxWidth:380,marginBottom:12}}
+      ,React.createElement("div",{style:{width:"100%",maxWidth:380,marginBottom:8}}
         ,React.createElement("div",{style:{fontSize:10,color:"#74897b",marginBottom:6}},"ポジション")
         ,React.createElement("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}}
           ,PLAYER_POS_OPTIONS.map(function(pos){
@@ -8013,6 +8058,20 @@ function ShareCardModal(props) {
                 color:posLabel===pos?"#000":"#9fb3a5"}},pos);
           })
         )
+      )
+      ,React.createElement("div",{style:{display:"flex",gap:6,marginBottom:8,width:"100%",maxWidth:380}}
+        ,React.createElement("button",{
+          onClick:function(){fileInputRef.current&&fileInputRef.current.click();},
+          style:{flex:1,padding:"10px",borderRadius:8,border:"1px dashed #555",
+            background:"#0c160e",color:photoUrl?"#18b257":"#74897b",fontSize:11,cursor:"pointer",fontWeight:700}}
+          ,photoUrl?"✅ 写真選択済み（変更）":"📷 写真を選ぶ")
+        ,React.createElement("button",{
+          onClick:function(){setNoPhoto(function(v){return !v;});},
+          style:{flex:1,padding:"10px",borderRadius:8,border:"none",
+            background:noPhoto?"#1a56a0":"#0c160e",color:noPhoto?"#fff":"#74897b",fontSize:11,cursor:"pointer",fontWeight:700}}
+          ,noPhoto?"📷 写真なし（ON）":"📷 写真なし")
+        ,React.createElement("input",{ref:fileInputRef,type:"file",accept:"image/*",
+          style:{display:"none"},onChange:handleFileChange})
       )
     )
     ,React.createElement("div",{style:{width:360,marginBottom:16,borderRadius:6,overflow:"hidden",
