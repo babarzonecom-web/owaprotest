@@ -1925,7 +1925,7 @@ const lsSave = (d) => {
   } catch(e3) {
     // 容量不足の場合はhistoryを削ってリトライ
     try {
-      const slim = {...d, history:[], currentGame:d.currentGame};
+      const slim = {...d, history:[], currentGame:d.currentGame, tournaments:d.tournaments||[], opponents:d.opponents||[], myTeam:d.myTeam||null};
       localStorage.setItem(SKEY, JSON.stringify(slim));
     } catch(e4) {}
   }
@@ -3948,7 +3948,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.54")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.56")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4032,7 +4032,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.54")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.56")
         )
 
         // ===== 新規チーム作成 =====
@@ -4270,14 +4270,15 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.54",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.54",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
+                  {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
+                  {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
+                  {ver:"v472.52",date:"2026/06/23",items:["ゲッツー（DP）で打点がつくバグを修正","犠打・犠飛のチーム合計が0になるバグを修正"]},
+                  {ver:"v472.51",date:"2026/06/23",items:["大会・対戦相手データがアップデートで消えるバグを修正"]},
+                  {ver:"v472.49",date:"2026/06/23",items:["オーダータブの打順と名前を1列に統合"]},
+                  {ver:"v472.45",date:"2026/06/22",items:["オーダー・投手・成績タブの選手名列を左固定（sticky）に改善"]},
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
-                  {ver:"v472.41",date:"2026/06/22",items:["打席モーダルで0番表示になるバグを修正"]},
-                  {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記が違う選手になるバグを修正"]},
-                  {ver:"v472.39",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
-                  {ver:"v472.37",date:"2026/06/22",items:["先攻→後攻スタメン設定で同じチームになるバグを修正"]},
-                  {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設","チームデータ同期（手動）を廃止"]},
+                  {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記バグを修正"]},
+                  {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設"]},
                 ].map((n,ni)=>
                   React.createElement('div', {key:ni, style:{
                     borderTop:ni===0?"none":"1px solid #1a2d1e",
@@ -5579,7 +5580,7 @@ function App() {
               }, "⚾ 試合を開始する")
 
             // サブリンク
-            , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:28}}
+            , React.createElement('div', {style:{display:"flex",gap:8,marginBottom:12}}
               , React.createElement('button', {
                   onClick:()=>setTab("history"),
                   style:{flex:1,background:"#0c160e",border:"1px solid #24402b",borderRadius:10,
@@ -5591,6 +5592,12 @@ function App() {
                     color:"#7db8e8",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700}
                 }, "📈 成績を見る")
             )
+            , React.createElement('button', {
+                onClick:function(){setShowShareCard(true);},
+                style:{width:"100%",background:"#0c160e",border:"1px solid #c8a400",borderRadius:10,
+                  color:"#ffd700",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700,
+                  marginBottom:16}
+              }, "📸 シェアカードを作る")
 
             // 運営からのお知らせ
             , React.createElement('div', {style:{...S.card,borderLeft:"4px solid #f97316"}}
@@ -5599,14 +5606,15 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.54",date:"2026/06/22",items:["オーダー・投手タブの選手名列を左固定（sticky）に改善"]},
-                  {ver:"v472.54",date:"2026/06/22",items:["成績タブの選手名列を左固定（sticky）に改善","成績・記録計算ロジックを金庫化"]},
+                  {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
+                  {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
+                  {ver:"v472.52",date:"2026/06/23",items:["ゲッツー（DP）で打点がつくバグを修正","犠打・犠飛のチーム合計が0になるバグを修正"]},
+                  {ver:"v472.51",date:"2026/06/23",items:["大会・対戦相手データがアップデートで消えるバグを修正"]},
+                  {ver:"v472.49",date:"2026/06/23",items:["オーダータブの打順と名前を1列に統合"]},
+                  {ver:"v472.45",date:"2026/06/22",items:["オーダー・投手・成績タブの選手名列を左固定（sticky）に改善"]},
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
-                  {ver:"v472.41",date:"2026/06/22",items:["打席モーダルで0番表示になるバグを修正"]},
-                  {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記が違う選手になるバグを修正"]},
-                  {ver:"v472.39",date:"2026/06/22",items:["自責点モーダルに投手名を表示するよう改善","閲覧モードにトップ画面を追加"]},
-                  {ver:"v472.37",date:"2026/06/22",items:["先攻→後攻スタメン設定で同じチームになるバグを修正"]},
-                  {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設","チームデータ同期（手動）を廃止"]},
+                  {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記バグを修正"]},
+                  {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設"]},
                 ].map((n,ni)=>
                   React.createElement('div', {key:ni, style:{
                     borderTop: ni===0?"none":"1px solid #1a2d1e",
