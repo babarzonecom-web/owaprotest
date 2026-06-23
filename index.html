@@ -3948,7 +3948,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.57")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.60")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4032,7 +4032,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.57")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.60")
         )
 
         // ===== 新規チーム作成 =====
@@ -4270,8 +4270,11 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v472.60",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.60",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.60",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
-                  {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
+                  {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
                   {ver:"v472.52",date:"2026/06/23",items:["ゲッツー（DP）で打点がつくバグを修正","犠打・犠飛のチーム合計が0になるバグを修正"]},
                   {ver:"v472.51",date:"2026/06/23",items:["大会・対戦相手データがアップデートで消えるバグを修正"]},
@@ -5607,8 +5610,11 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v472.60",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.60",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.60",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
-                  {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
+                  {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
                   {ver:"v472.52",date:"2026/06/23",items:["ゲッツー（DP）で打点がつくバグを修正","犠打・犠飛のチーム合計が0になるバグを修正"]},
                   {ver:"v472.51",date:"2026/06/23",items:["大会・対戦相手データがアップデートで消えるバグを修正"]},
@@ -7708,6 +7714,16 @@ function ShareCardModal(props) {
   var photoUrl = photoState[0]; var setPhotoUrl = photoState[1];
   var noPhotoState = useState(false);
   var noPhoto = noPhotoState[0]; var setNoPhoto = noPhotoState[1];
+  var photoScaleState = useState(100);
+  var photoScale = photoScaleState[0]; var setPhotoScale = photoScaleState[1];
+  var photoOffsetYState = useState(50);
+  var photoOffsetY = photoOffsetYState[0]; var setPhotoOffsetY = photoOffsetYState[1];
+  var captionState = useState("");
+  var captionText = captionState[0]; var setCaptionText = captionState[1];
+  var captionSizeState = useState(18);
+  var captionSize = captionSizeState[0]; var setCaptionSize = captionSizeState[1];
+  var captionPosState = useState("bottom");
+  var captionPos = captionPosState[0]; var setCaptionPos = captionPosState[1];
 
   var cardRef = React.useRef(null);
   var fileInputRef = React.useRef(null);
@@ -7786,12 +7802,45 @@ function ShareCardModal(props) {
     html2canvas(cardRef.current,{scale:3,useCORS:true,backgroundColor:"#000",logging:false,
       allowTaint:true,imageTimeout:0})
       .then(function(canvas){
-        // JPEGで出力（スマホ写真フォルダに保存しやすい形式）
-        var url=canvas.toDataURL("image/jpeg",0.95);
-        var a=document.createElement("a");
-        a.href=url; a.download="owapro_card.jpg"; a.click();
-        setCapturing(false);
-      }).catch(function(e){alert("保存失敗: "+e.message); setCapturing(false);});
+        // Web Share API（iOS対応・写真アプリに保存できる）
+        if(navigator.share && navigator.canShare) {
+          canvas.toBlob(function(blob){
+            if(!blob){setCapturing(false);return;}
+            var file = new File([blob],"owapro_card.jpg",{type:"image/jpeg"});
+            if(navigator.canShare({files:[file]})){
+              navigator.share({files:[file],title:"おわプロスコア"})
+                .then(function(){setCapturing(false);})
+                .catch(function(){
+                  // キャンセルまたはエラー時はimg表示にフォールバック
+                  showImgPopup(canvas);
+                });
+            } else {
+              showImgPopup(canvas);
+            }
+          },"image/jpeg",0.95);
+        } else {
+          showImgPopup(canvas);
+        }
+      }).catch(function(e){alert("生成失敗: "+e.message); setCapturing(false);});
+  }
+
+  function showImgPopup(canvas) {
+    // フォールバック：画像を大きく表示してロングタップで保存案内
+    var url = canvas.toDataURL("image/jpeg",0.95);
+    var overlay = document.createElement("div");
+    overlay.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;";
+    var msg = document.createElement("div");
+    msg.style.cssText="color:#fff;font-size:13px;margin-bottom:12px;text-align:center;font-weight:700;";
+    msg.textContent="画像を長押し →「写真に追加」で保存できます";
+    var img = document.createElement("img");
+    img.src=url; img.style.cssText="max-width:100%;max-height:70vh;border-radius:6px;";
+    var closeBtn = document.createElement("button");
+    closeBtn.textContent="✕ 閉じる";
+    closeBtn.style.cssText="margin-top:16px;padding:12px 32px;background:#333;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;";
+    closeBtn.onclick=function(){document.body.removeChild(overlay);};
+    overlay.appendChild(msg); overlay.appendChild(img); overlay.appendChild(closeBtn);
+    document.body.appendChild(overlay);
+    setCapturing(false);
   }
 
   // スタイル
@@ -7843,7 +7892,12 @@ function ShareCardModal(props) {
         background:"#050510",display:"flex",alignItems:"center",justifyContent:"center",
         borderBottom:"2px solid "+GOLD}}
         ,photoUrl
-          ?React.createElement("img",{src:photoUrl,style:{width:"100%",height:"100%",objectFit:"cover"}})
+          ?React.createElement("img",{src:photoUrl,style:{
+            width:photoScale+"%",height:photoScale+"%",
+            objectFit:"cover",objectPosition:"center "+photoOffsetY+"%",
+            position:"absolute",top:"50%",left:"50%",
+            transform:"translate(-50%,-50%)",
+            minWidth:"100%",minHeight:"100%"}})
           :React.createElement("div",{style:{color:"#222",fontFamily:"'Bebas Neue',sans-serif",fontSize:10,letterSpacing:3}},"PHOTO")
         ,React.createElement("div",{style:{position:"absolute",top:5,left:5,width:13,height:13,borderTop:"2px solid "+GOLD,borderLeft:"2px solid "+GOLD}})
         ,React.createElement("div",{style:{position:"absolute",top:5,right:5,width:13,height:13,borderTop:"2px solid "+GOLD,borderRight:"2px solid "+GOLD}})
@@ -7880,6 +7934,13 @@ function ShareCardModal(props) {
         ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,letterSpacing:4,
           padding:"4px 22px",border:"2px solid "+sc,borderRadius:2,color:sc,background:"rgba(0,0,0,0.3)",
           textShadow:"0 0 12px "+sc}},"✦ "+stamp+" ✦")
+      )
+      ,captionText&&React.createElement("div",{style:{padding:"4px 14px 2px",background:"rgba(0,0,0,0.5)"}}
+        ,React.createElement("div",{style:{
+          fontFamily:"'Noto Sans JP',sans-serif",fontWeight:900,
+          fontSize:captionSize,color:"#fff",lineHeight:1.3,textAlign:"center",
+          textShadow:"0 2px 8px rgba(0,0,0,0.9)",
+          whiteSpace:"pre-wrap",wordBreak:"break-all"}},captionText)
       )
       ,cardType==="A"&&React.createElement("div",{style:{display:"flex",gap:5,padding:"0 10px 6px"}}
         ,React.createElement("div",{style:{flex:1}}
@@ -7939,7 +8000,15 @@ function ShareCardModal(props) {
           display:"flex",alignItems:"center",justifyContent:"center",
           borderRight:"2px solid "+ac,position:"relative",overflow:"hidden"}}
           ,photoUrl
-            ?React.createElement("img",{src:photoUrl,style:{width:"100%",height:"100%",objectFit:"cover",objectPosition:"center top"}})
+            ?React.createElement("img",{src:photoUrl,style:{
+              width:(photoScale)+"%",
+              height:(photoScale)+"%",
+              objectFit:"cover",
+              objectPosition:"center "+photoOffsetY+"%",
+              position:"absolute",
+              top:"50%",left:"50%",
+              transform:"translate(-50%,-50%)",
+              minWidth:"100%",minHeight:"100%"}})
             :React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:9,color:"#1e1e1e",letterSpacing:2}},"PHOTO")
           ,React.createElement("div",{style:{position:"absolute",top:5,left:5,width:13,height:13,borderTop:"2px solid "+ac,borderLeft:"2px solid "+ac}})
           ,React.createElement("div",{style:{position:"absolute",top:5,right:5,width:13,height:13,borderTop:"2px solid "+ac,borderRight:"2px solid "+ac}})
@@ -7968,6 +8037,15 @@ function ShareCardModal(props) {
           ,React.createElement("div",{style:{fontSize:9,color:"#666",fontWeight:700}},myTeam?myTeam.name:"")
         )
       )
+      ,captionText&&React.createElement("div",{style:{position:"relative",zIndex:2,
+        margin:"0 0 0 0",padding:"6px 14px 4px",
+        background:captionPos==="top"?"rgba(0,0,0,0.85)":"transparent"}}
+        ,captionPos==="top"&&React.createElement("div",{style:{
+          fontFamily:"'Noto Sans JP',sans-serif",fontWeight:900,
+          fontSize:captionSize,color:"#fff",lineHeight:1.3,
+          textShadow:"0 2px 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.9)",
+          whiteSpace:"pre-wrap",wordBreak:"break-all"}},captionText)
+      )
       ,React.createElement("div",{style:{position:"relative",zIndex:2,margin:"6px 10px 8px",
         border:"1px solid #1c1c1c",borderRadius:3,overflow:"hidden"}}
         ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:8,letterSpacing:3,
@@ -7989,6 +8067,14 @@ function ShareCardModal(props) {
           ,React.createElement(StatCell,{lbl:"K",val:ps?ps.k:null,col:"#f87171"})
           ,React.createElement(StatCell,{lbl:"SB",val:ps?ps.sb:null,col:"#7dd3fc"})
         )
+      )
+      ,captionText&&captionPos==="bottom"&&React.createElement("div",{style:{position:"relative",zIndex:2,
+        padding:"4px 14px 8px",background:"rgba(0,0,0,0.7)"}}
+        ,React.createElement("div",{style:{
+          fontFamily:"'Noto Sans JP',sans-serif",fontWeight:900,
+          fontSize:captionSize,color:"#fff",lineHeight:1.3,
+          textShadow:"0 2px 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.9)",
+          whiteSpace:"pre-wrap",wordBreak:"break-all"}},captionText)
       )
     );
   }
@@ -8022,10 +8108,42 @@ function ShareCardModal(props) {
         ,React.createElement("button",{
           onClick:function(){fileInputRef.current&&fileInputRef.current.click();},
           style:{width:"100%",padding:"10px",borderRadius:8,border:"1px dashed #555",
-            background:"#0c160e",color:photoUrl?"#18b257":"#74897b",fontSize:12,cursor:"pointer",fontWeight:700}}
+            background:"#0c160e",color:photoUrl?"#18b257":"#74897b",fontSize:12,cursor:"pointer",fontWeight:700,marginBottom:8}}
           ,photoUrl?"✅ 写真選択済み（タップで変更）":"📷 写真を選ぶ")
         ,React.createElement("input",{ref:fileInputRef,type:"file",accept:"image/*",
           style:{display:"none"},onChange:handleFileChange})
+        ,photoUrl&&React.createElement("div",null
+          ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}}
+            ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"サイズ")
+            ,React.createElement("input",{type:"range",min:100,max:300,value:photoScale,
+              onChange:function(e){setPhotoScale(Number(e.target.value));},
+              style:{flex:1,accentColor:"#ffd700"}})
+            ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:36,textAlign:"right"}},photoScale+"%")
+          )
+          ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}}
+            ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"上下位置")
+            ,React.createElement("input",{type:"range",min:0,max:100,value:photoOffsetY,
+              onChange:function(e){setPhotoOffsetY(Number(e.target.value));},
+              style:{flex:1,accentColor:"#ffd700"}})
+            ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:36,textAlign:"right"}},(photoOffsetY<=20?"上寄り":photoOffsetY>=80?"下寄り":"中央"))
+          )
+        )
+      )
+      ,photoUrl&&!noPhoto&&React.createElement("div",{style:{width:"100%",maxWidth:380,marginBottom:8}}
+        ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}}
+          ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"サイズ")
+          ,React.createElement("input",{type:"range",min:100,max:300,value:photoScale,
+            onChange:function(e){setPhotoScale(Number(e.target.value));},
+            style:{flex:1,accentColor:"#ffd700"}})
+          ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:36,textAlign:"right"}},photoScale+"%")
+        )
+        ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}}
+          ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"上下位置")
+          ,React.createElement("input",{type:"range",min:0,max:100,value:photoOffsetY,
+            onChange:function(e){setPhotoOffsetY(Number(e.target.value));},
+            style:{flex:1,accentColor:"#ffd700"}})
+          ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:36,textAlign:"right"}},(photoOffsetY<=20?"上寄り":photoOffsetY>=80?"下寄り":"中央"))
+        )
       )
       ,React.createElement("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginBottom:12,width:"100%",maxWidth:380}}
         ,["VICTORY","WIN!!","LOSE...","DRAW","VICTORY!!!!!"].map(function(s){
@@ -8069,7 +8187,7 @@ function ShareCardModal(props) {
           onClick:function(){setNoPhoto(function(v){return !v;});},
           style:{flex:1,padding:"10px",borderRadius:8,border:"none",
             background:noPhoto?"#1a56a0":"#0c160e",color:noPhoto?"#fff":"#74897b",fontSize:11,cursor:"pointer",fontWeight:700}}
-          ,noPhoto?"📷 写真なし（ON）":"📷 写真なし")
+          ,noPhoto?"📷 写真あり":"📷 写真なし")
         ,React.createElement("input",{ref:fileInputRef,type:"file",accept:"image/*",
           style:{display:"none"},onChange:handleFileChange})
       )
@@ -8077,6 +8195,37 @@ function ShareCardModal(props) {
     ,React.createElement("div",{style:{width:360,marginBottom:16,borderRadius:6,overflow:"hidden",
       boxShadow:"0 0 0 3px #111,0 0 0 5px #444,0 0 30px rgba(0,0,0,0.8)"}}
       ,mode==="game"?React.createElement(GameCard,null):React.createElement(PlayerCard,null)
+    )
+    // キャプション入力UI
+    ,React.createElement("div",{style:{width:"100%",maxWidth:380,marginBottom:12,
+      background:"#0c160e",border:"1px solid #24402b",borderRadius:10,padding:"12px"}}
+      ,React.createElement("div",{style:{fontSize:11,color:"#74897b",marginBottom:8,fontWeight:700}},"💬 テキストを追加（任意）")
+      ,React.createElement("input",{
+        type:"text",
+        placeholder:"例：中山、ホームラン！",
+        value:captionText,
+        onChange:function(e){setCaptionText(e.target.value);},
+        style:{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #24402b",
+          background:"#122016",color:"#e9f0ea",fontSize:14,outline:"none",
+          boxSizing:"border-box",marginBottom:10,fontFamily:"'Noto Sans JP',sans-serif"}
+      })
+      ,captionText&&React.createElement(React.Fragment,null
+        ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:8}}
+          ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"文字サイズ")
+          ,React.createElement("input",{type:"range",min:10,max:36,value:captionSize,
+            onChange:function(e){setCaptionSize(Number(e.target.value));},
+            style:{flex:1,accentColor:"#ffd700"}})
+          ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:28,textAlign:"right"}},captionSize+"px")
+        )
+        ,(mode==="player_bat"||mode==="player_pit")&&React.createElement("div",{style:{display:"flex",gap:6}}
+          ,["top","bottom"].map(function(p){
+            return React.createElement("button",{key:p,onClick:function(){setCaptionPos(p);},
+              style:{flex:1,padding:"6px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
+                background:captionPos===p?"#c8a400":"#1a1a1a",color:captionPos===p?"#000":"#74897b"}}
+              ,p==="top"?"上に表示":"下に表示");
+          })
+        )
+      )
     )
     ,React.createElement("button",{onClick:capture,disabled:capturing,
       style:{width:"100%",maxWidth:380,padding:"14px",borderRadius:12,border:"none",
