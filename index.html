@@ -3928,7 +3928,7 @@ function App() {
       , React.createElement('nav', { style: {...S.nav, position:"relative", padding:"0 4px", paddingTop: isReadOnly ? "calc(env(safe-area-inset-top, 0px) + 40px)" : undefined},}
         , React.createElement('div',{style:{display:"flex",overflowX:"auto",flex:1,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}
         , tab!=="login" && (isReadOnly
-          ? [["top","🏠 トップ"],["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["logout","⚙️ 設定"]].map(([id,l])=>(
+          ? [["top","🏠 トップ"],["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["share","📸 シェア"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
                 background:tab===id?"#1a2a45":"transparent",border:"none",borderRadius:"8px 8px 0 0",
                 borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
@@ -3937,7 +3937,7 @@ function App() {
                 fontWeight:tab===id?800:500,
               },}, l)
             ))
-          : [["top","🏠 トップ"],["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"]].map(([id,l])=>(
+          : [["top","🏠 トップ"],["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"],["share","📸 シェア"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
                 background:"transparent",border:"none",
                 borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
@@ -3948,7 +3948,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.60")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.61")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4032,7 +4032,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.60")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.61")
         )
 
         // ===== 新規チーム作成 =====
@@ -4257,7 +4257,7 @@ function App() {
                 }, "📈 成績を見る")
             )
             , React.createElement('button', {
-                onClick:function(){setShowShareCard(true);},
+                onClick:function(){setTab("share");},
                 style:{width:"100%",background:"#0c160e",border:"1px solid #c8a400",borderRadius:10,
                   color:"#ffd700",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700,
                   marginBottom:16}
@@ -4270,9 +4270,10 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.60",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.60",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.60",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.61",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.61",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.61",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.61",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -5597,7 +5598,7 @@ function App() {
                 }, "📈 成績を見る")
             )
             , React.createElement('button', {
-                onClick:function(){setShowShareCard(true);},
+                onClick:function(){setTab("share");},
                 style:{width:"100%",background:"#0c160e",border:"1px solid #c8a400",borderRadius:10,
                   color:"#ffd700",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700,
                   marginBottom:16}
@@ -5610,9 +5611,10 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.60",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.60",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.60",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.61",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.61",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.61",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.61",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -5894,7 +5896,15 @@ function App() {
             })
         ))
 
-        , tab==="teams"&&(React.createElement(React.Fragment, null
+        , tab==="share"&&React.createElement(React.Fragment, null
+          , React.createElement(ShareCardModal, {
+              game:game, history:history, myTeam:myTeam,
+              onClose:function(){setTab("top");},
+              asTab:true
+            })
+        )
+
+                , tab==="teams"&&(React.createElement(React.Fragment, null
 
           // ===== 接続状態カード =====
           , React.createElement('div', {style:{
@@ -7678,10 +7688,6 @@ function App() {
         return null;
       })()
 
-      , showShareCard&&React.createElement(ShareCardModal, {
-        game:game, history:history, myTeam:myTeam,
-        onClose:function(){setShowShareCard(false);}
-      })
       , toast&&React.createElement('div', { style: S.toast,}, toast)
     )
   );
@@ -7697,6 +7703,7 @@ function ShareCardModal(props) {
   var history = props.history || [];
   var myTeam = props.myTeam;
   var onClose = props.onClose;
+  var asTab = props.asTab || false;
 
   var modeState = useState("game");
   var mode = modeState[0]; var setMode = modeState[1];
@@ -7845,8 +7852,10 @@ function ShareCardModal(props) {
 
   // スタイル
   var GOLD="#ffd700";
-  var sOverlay={position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.93)",
-    display:"flex",flexDirection:"column",alignItems:"center",overflowY:"auto",padding:"16px 12px 40px"};
+  var sOverlay = asTab
+    ? {display:"flex",flexDirection:"column",alignItems:"center",padding:"16px 12px 40px",minHeight:"100%"}
+    : {position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.93)",
+        display:"flex",flexDirection:"column",alignItems:"center",overflowY:"auto",padding:"16px 12px 40px"};
   var sCard={width:360,background:"#000",borderRadius:6,overflow:"hidden",
     fontFamily:"'Noto Sans JP',sans-serif"};
   var sBanner={background:"linear-gradient(90deg,#b8900a,"+GOLD+",#e8b800,"+GOLD+",#b8900a)",
@@ -8081,10 +8090,12 @@ function ShareCardModal(props) {
 
   return React.createElement("div",{style:sOverlay,
     onClick:function(e){if(e.target===e.currentTarget)onClose();}}
-    ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:16,width:"100%",maxWidth:380}}
+    ,!asTab&&React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:16,width:"100%",maxWidth:380}}
       ,React.createElement("div",{style:{fontSize:14,fontWeight:900,color:"#e9f0ea",flex:1}},"📸 シェアカード作成")
       ,React.createElement("button",{onClick:onClose,style:{background:"none",border:"none",color:"#666",fontSize:20,cursor:"pointer"}},"✕")
     )
+    ,asTab&&React.createElement("div",{style:{fontSize:16,fontWeight:900,color:"#e9f0ea",marginBottom:16,width:"100%",maxWidth:380}},
+      "📸 シェアカード作成")
     ,React.createElement("div",{style:{display:"flex",gap:6,marginBottom:12,width:"100%",maxWidth:380}}
       ,["game","player_bat"].map(function(m){
         var lbl=m==="game"?"⚾ 試合結果":"🏏 打者成績";
