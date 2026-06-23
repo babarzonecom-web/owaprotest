@@ -3543,7 +3543,59 @@ function App() {
 
   const aStats=computeStats(game.awayLineup);
   const hStats=computeStats(game.homeLineup);
-  const pitcherStats=computePitcherStats(game); 
+  const pitcherStats=computePitcherStats(game);
+
+  // シェアカード用：myTeamの投手通算成績をaggregateと同じロジックで計算
+  const sharePitcherMap = React.useMemo(function(){
+    if(!myTeam||!myTeam.name) return {};
+    var allG=(history||[]).filter(function(g){return g&&g.awayLineup&&g.homeLineup&&g.finished;});
+    if(game&&game.finished&&game.id&&!allG.some(function(h){return h.id===game.id;})) allG=[game].concat(allG);
+    var map={};
+    allG.forEach(function(fg){
+      ["away","home"].forEach(function(side){
+        if(fg[side+"Team"]!==myTeam.name) return;
+        var pits=fg[side+"Pitchers"]||[];
+        var pStatsResult=computePitcherStats(fg);
+        var autoArr=(pStatsResult[side]||[]);
+        var rawLog=fg[side+"PitcherLog"]||[];
+        var playedSet=new Set(rawLog.map(function(l){return l.pitcherIdx;}));
+        if(rawLog.length===0&&pits.length>0) playedSet.add(0);
+        pits.forEach(function(p,i){
+          if(!p||!p.name||/^投手\d+$/.test(p.name)) return;
+          if(!playedSet.has(i)) return;
+          if(!map[p.name]) map[p.name]={outs:0,er:0,h:0,bb:0,k:0,hbp:0,outsXinn:0,games:new Set(),w:0,l:0,s:0};
+          var m=map[p.name];
+          var a=autoArr[i]||{};
+          var autoIpOuts=Math.floor((a.autoIp||0)/10)*3+((a.autoIp||0)%10);
+          var outsGot=p.manualIp!==undefined?p.manualIp:autoIpOuts;
+          m.outs+=outsGot;
+          m.er+=(p.erManual!==undefined?p.erManual:((p.manualOverride&&p.er!==undefined)?p.er:0));
+          m.h+=(p.manualH!==undefined?p.manualH:(a.autoH||0));
+          m.bb+=(p.manualBb!==undefined?p.manualBb:(a.autoBb||0));
+          m.k+=(p.manualK!==undefined?p.manualK:(a.autoK||0));
+          m.hbp+=(p.manualHbp!==undefined?p.manualHbp:(a.autoHbp||0));
+          m.outsXinn+=outsGot*(fg.innings||9);
+          m.games.add(fg.id);
+          var pr=((fg.pitcherResults||{})[p.name])||{};
+          if(pr.win) m.w++; if(pr.lose) m.l++; if(pr.save) m.s++;
+        });
+      });
+    });
+    // ERA等を計算
+    var result={};
+    Object.keys(map).forEach(function(name){
+      var m=map[name];
+      var ipFull=Math.floor(m.outs/3); var ipRem=m.outs%3;
+      var ipStr=ipFull+(ipRem>0?"."+ipRem:"");
+      var ipNum=ipFull+ipRem/3;
+      var avgInn=m.outs>0?(m.outsXinn/m.outs):9;
+      var era=ipNum>0?(m.er*avgInn/ipNum).toFixed(2):(m.er>0?"∞":"0.00");
+      var whip=ipNum>0?((m.bb+m.h)/ipNum).toFixed(2):"—";
+      var k9=ipNum>0?(m.k*avgInn/ipNum).toFixed(1):"0.0";
+      result[name]={g:m.games.size,w:m.w,l:m.l,s:m.s,ip:ipStr,er:m.er,h:m.h,bb:m.bb,k:m.k,hbp:m.hbp,era:era,whip:whip,k9:k9};
+    });
+    return result;
+  },[myTeam,history,game]); 
   const curTeam   = game.half==="top"?"away":"home";
   const curLabel  = game.half==="top"?game.awayTeam:game.homeTeam;
   const curLineup = game.half==="top"?game.awayLineup:game.homeLineup;
@@ -3948,7 +4000,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.64")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.65")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4032,7 +4084,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.64")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.65")
         )
 
         // ===== 新規チーム作成 =====
@@ -4270,13 +4322,14 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -5614,13 +5667,14 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.64",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.65",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -5905,6 +5959,8 @@ function App() {
         , tab==="share"&&React.createElement(React.Fragment, null
           , React.createElement(ShareCardModal, {
               game:game, history:history, myTeam:myTeam,
+              tournaments:tournaments,
+              sharePitcherMap:sharePitcherMap,
               onClose:function(){setTab("top");},
               asTab:true
             })
@@ -7710,6 +7766,7 @@ function ShareCardModal(props) {
   var myTeam = props.myTeam;
   var onClose = props.onClose;
   var asTab = props.asTab || false;
+  var sharePitcherMap = props.sharePitcherMap || {};
 
   var modeState = useState("game");
   var mode = modeState[0]; var setMode = modeState[1];
@@ -7808,9 +7865,13 @@ function ShareCardModal(props) {
     playerStats={pa:pa,ab:ab,h:h,hr:hr,rbi:rbi,bb:bb,k:k,sb:sb,avg:avg,slg:slg,obp:obp,ops:ops,g:gPlayed};
   }
 
-  // 投手成績集計（aggregatePitcherStatsと同じロジックで集計）
+  // 投手成績集計（メインコンポーネントで計算済みのsharePitcherMapを使用）
   var pitStats = null;
-  if(selPlayer && mode==="player_pit" && allGames.length>0) {
+  if(selPlayer && mode==="player_pit") {
+    pitStats = sharePitcherMap[selPlayer.name] || null;
+  }
+  // 以下は使わないがallGamesは打撃集計で使用
+  if(false && selPlayer && mode==="player_pit" && allGames.length>0) {
     var pOuts=0,pw=0,pl=0,ps_=0,per=0,phits=0,pbbs=0,pks=0,phbp=0,pgames=new Set(),pOutsXinn=0;
     allGames.forEach(function(fg){
       ["away","home"].forEach(function(side){
@@ -7846,7 +7907,8 @@ function ShareCardModal(props) {
     });
     var ipFull=Math.floor(pOuts/3); var ipRem=pOuts%3;
     var ipStr=ipFull+(ipRem>0?"."+ipRem:"");
-    var avgInnings=pOuts>0?pOutsXinn/pOuts:9;
+    // 成績タブと同じ加重平均イニング数でERA・K/9を計算
+    var avgInnings=pOuts>0?(pOutsXinn/pOuts):9;
     var ipNum=ipFull+ipRem/3;
     var eraVal=ipNum>0?(per*avgInnings/ipNum).toFixed(2):(per>0?"∞":"0.00");
     var whipVal=ipNum>0?((pbbs+phits)/ipNum).toFixed(2):"—";
