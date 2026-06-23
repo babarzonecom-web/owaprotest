@@ -4256,12 +4256,11 @@ function App() {
                     color:"#7db8e8",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700}
                 }, "📈 成績を見る")
             )
-            // スクショボタン
             , React.createElement('button', {
-                onClick:()=>setShowShareCard(true),
+                onClick:function(){setShowShareCard(true);},
                 style:{width:"100%",background:"#0c160e",border:"1px solid #c8a400",borderRadius:10,
                   color:"#ffd700",fontSize:13,cursor:"pointer",padding:"12px 8px",fontWeight:700,
-                  marginBottom:28}
+                  marginBottom:16}
               }, "📸 シェアカードを作る")
 
             // 運営からのお知らせ（管理者トップと同じ）
@@ -7664,15 +7663,8 @@ function App() {
       })()
 
       , showShareCard&&React.createElement(ShareCardModal, {
-        type:"game",
-        game:game,
-        filteredGames:(()=>{
-          const hist=(history||[]);
-          const all=[...(game&&game.finished&&game.id&&!hist.some(h=>h.id===game.id)?[game]:[]),...hist];
-          return all.filter(g=>g&&g.awayLineup&&g.homeLineup&&g.finished);
-        })(),
-        myTeam:myTeam,
-        onClose:()=>setShowShareCard(false),
+        game:game, history:history, myTeam:myTeam,
+        onClose:function(){setShowShareCard(false);}
       })
       , toast&&React.createElement('div', { style: S.toast,}, toast)
     )
@@ -7680,425 +7672,345 @@ function App() {
 }
 
 // ================================================================
-// 📸 ShareCardModal — スクショカード生成モーダル
-// 既存ロジックに一切依存しない独立コンポーネント
+// 📸 ShareCardModal
 // ================================================================
-const POS_EN = {
-  "投":"PITCHER","捕":"CATCHER","一":"FIRST BASEMAN","二":"SECOND BASEMAN",
-  "三":"THIRD BASEMAN","遊":"SHORTSTOP","左":"LEFT FIELDER","中":"CENTER FIELDER",
-  "右":"RIGHT FIELDER","指":"DESIGNATED HITTER"
-};
-const PLAYER_POS_OPTIONS = ["PITCHER","CATCHER","INFIELDER","OUTFIELDER","TWO-WAY PLAYER"];
+var PLAYER_POS_OPTIONS = ["PITCHER","CATCHER","INFIELDER","OUTFIELDER","TWO-WAY PLAYER"];
 
-function ShareCardModal({ type, game, filteredGames, myTeam, onClose }) {
-  // type: "game" | "player_bat" | "player_pit"
-  const [mode, setMode]       = React.useState(type||"game");
-  const [cardType, setCardType] = React.useState("A"); // A=スタメンあり B=なし
-  const [stampType, setStamp] = React.useState("VICTORY");
-  const [selPlayer, setSelPlayer] = React.useState(null);
-  const [posLabel, setPosLabel] = React.useState("OUTFIELDER");
-  const [capturing, setCapturing] = React.useState(false);
-  const cardRef = React.useRef(null);
+function ShareCardModal(props) {
+  var game = props.game;
+  var history = props.history || [];
+  var myTeam = props.myTeam;
+  var onClose = props.onClose;
 
-  // 試合データ（最新）
-  const g = game;
-  const awayScore = g ? Object.values(g.awayScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0) : 0;
-  const homeScore = g ? Object.values(g.homeScore||{}).reduce((s,v)=>s+(parseInt(v)||0),0) : 0;
-  const innings = g ? Math.max(g.innings||7, 7) : 7;
-  const innArr = Array.from({length:innings},(_,i)=>i+1);
+  var modeState = useState("game");
+  var mode = modeState[0]; var setMode = modeState[1];
+  var cardTypeState = useState("B");
+  var cardType = cardTypeState[0]; var setCardType = cardTypeState[1];
+  var stampState = useState("VICTORY");
+  var stamp = stampState[0]; var setStamp = stampState[1];
+  var selPlayerState = useState(null);
+  var selPlayer = selPlayerState[0]; var setSelPlayer = selPlayerState[1];
+  var posState = useState("OUTFIELDER");
+  var posLabel = posState[0]; var setPosLabel = posState[1];
+  var capState = useState(false);
+  var capturing = capState[0]; var setCapturing = capState[1];
 
-  // 選手リスト（自チームのみ）
-  const playerList = React.useMemo(()=>{
-    if(!myTeam||!myTeam.members) return [];
-    return myTeam.members.map(m=>typeof m==="string"?{name:m,pos:""}:m);
-  },[myTeam]);
+  var cardRef = React.useRef(null);
 
-  // 選手の通算成績
-  const playerStats = React.useMemo(()=>{
-    if(!selPlayer||!filteredGames) return null;
-    let pa=0,ab=0,h=0,hr=0,rbi=0,bb=0,k=0,sb=0,h2=0,h3=0,r=0,sac=0,sf=0,hbp=0,ci=0;
-    filteredGames.forEach(fg=>{
-      const sides=["away","home"];
-      sides.forEach(side=>{
-        const lu=fg[side+"Lineup"]||[];
-        lu.forEach(p=>{
-          const allP=[p,...((p._subOuts||[]))];
-          allP.forEach(pp=>{
+  // 試合スコア計算
+  var awayScore = 0; var homeScore = 0;
+  if(game && game.awayScore) Object.values(game.awayScore).forEach(function(v){awayScore+=parseInt(v)||0;});
+  if(game && game.homeScore) Object.values(game.homeScore).forEach(function(v){homeScore+=parseInt(v)||0;});
+  var innings = (game && game.innings) ? game.innings : 7;
+  var innArr = [];
+  for(var i=1;i<=innings;i++) innArr.push(i);
+
+  // 選手リスト
+  var playerList = [];
+  if(myTeam && myTeam.members) {
+    myTeam.members.forEach(function(m){ playerList.push(typeof m==="string"?{name:m,pos:""}:m); });
+  }
+
+  // 通算打撃成績
+  var allGames = history.filter(function(g){return g&&g.awayLineup&&g.homeLineup&&g.finished;});
+  var playerStats = null;
+  if(selPlayer && mode==="player_bat" && allGames.length>0) {
+    var pa=0,ab=0,h=0,hr=0,rbi=0,bb=0,k=0,sb=0,h2=0,h3=0,sac=0,sf=0,hbp=0,ci=0,run=0;
+    allGames.forEach(function(fg){
+      ["away","home"].forEach(function(side){
+        var lu=fg[side+"Lineup"]||[];
+        lu.forEach(function(p){
+          var allP=[p].concat(p._subOuts||[]);
+          allP.forEach(function(pp){
             if(!pp||pp.name!==selPlayer.name) return;
-            Object.values(pp.atBats||{}).flat().forEach(ab_=>{
-              if(!ab_||!ab_.code) return;
-              const c=ab_.code;
-              pa++;
-              if(!["BB","IBB","HBP","KW","CI","SAC","SF"].includes(c)) ab++;
-              if(["H1","H2","H3","HR"].includes(c)){ h++; if(c==="H2")h2++; if(c==="H3")h3++; if(c==="HR")hr++; }
-              if(["BB","IBB"].includes(c)) bb++;
-              if(c==="HBP") hbp++;
-              if(["K","KL"].includes(c)) k++;
-              if(c==="SAC") sac++;
-              if(c==="SF") sf++;
-              if(c==="CI") ci++;
+            Object.values(pp.atBats||{}).forEach(function(inningAbs){
+              var abs=Array.isArray(inningAbs)?inningAbs:[inningAbs];
+              abs.forEach(function(ab_){
+                if(!ab_||!ab_.code) return;
+                var c=ab_.code;
+                pa++;
+                if(["BB","IBB","HBP","KW","CI","SAC","SF"].indexOf(c)<0) ab++;
+                if(["H1","H2","H3","HR"].indexOf(c)>=0){h++;if(c==="H2")h2++;if(c==="H3")h3++;if(c==="HR")hr++;}
+                if(["BB","IBB"].indexOf(c)>=0) bb++;
+                if(c==="HBP") hbp++;
+                if(["K","KL"].indexOf(c)>=0) k++;
+                if(c==="SAC") sac++;
+                if(c==="SF") sf++;
+                if(c==="CI") ci++;
+              });
             });
-            rbi+=(pp.rbi||0); sb+=(pp.sb||0); r+=(pp.run||0);
+            rbi+=(pp.rbi||0); sb+=(pp.sb||0); run+=(pp.run||0);
           });
         });
       });
     });
-    const avg = ab>0?(h/ab).toFixed(3).replace("0.","."):".000";
-    const slg = ab>0?(((h-h2-h3-hr)+h2*2+h3*3+hr*4)/ab).toFixed(3).replace("0.","."):".000";
-    const obpD = pa-sac-ci; const obp = obpD>0?((h+bb+hbp)/obpD).toFixed(3).replace("0.","."):".000";
-    const ops = obpD>0?(parseFloat(obp)+parseFloat(slg)).toFixed(3).replace("0.","."):".000";
-    return {pa,ab,h,hr,rbi,bb,k,sb,h2,h3,r,avg,slg,obp,ops,g:filteredGames.length};
-  },[selPlayer,filteredGames]);
-
-  // 投手成績
-  const pitcherStats = React.useMemo(()=>{
-    if(!selPlayer||!filteredGames) return null;
-    let gs=0,wins=0,losses=0,saves=0,holds=0,ip=0,er=0,hits=0,bbs=0,ks=0,hbp=0;
-    filteredGames.forEach(fg=>{
-      ["away","home"].forEach(side=>{
-        const pits=(fg[side+"Pitchers"]||[]);
-        const pLog=(fg[side+"PitcherLog"]||[]);
-        pits.forEach((p,i)=>{
-          if(!p||p.name!==selPlayer.name) return;
-          gs++;
-          // computePitcherStatsの結果を再利用（LOCKED ZONE内）
-          const ab_=Object.values(fg[(side==="away"?"home":"away")+"Lineup"]||{})
-            .flatMap(batter=>Object.values(batter.atBats||{}).flat())
-            .filter(ab=>ab&&(ab.pLogIdx===i||(ab.pLogIdx===undefined)));
-          // 簡易集計
-          const myEr = (fg[side+"ErManual"]||[]).filter(e=>e&&e.pitIdx===i).length;
-          er+=myEr;
-          wins += (fg[side+"Win"]===i)?1:0;
-        });
-      });
-    });
-    return {g:gs,w:wins,l:losses,s:saves,ip:ip.toFixed(1),er,h:hits,bb:bbs,k:ks};
-  },[selPlayer,filteredGames]);
+    var avg=ab>0?(h/ab).toFixed(3).replace("0.","."):".000";
+    var tb=(h-h2-h3-hr)+h2*2+h3*3+hr*4;
+    var slg=ab>0?(tb/ab).toFixed(3).replace("0.","."):".000";
+    var obpD=pa-sac-ci;
+    var obp=obpD>0?((h+bb+hbp)/obpD).toFixed(3).replace("0.","."):".000";
+    var ops=obpD>0?(parseFloat(obp)+parseFloat(slg)).toFixed(3).replace("0.","."):".000";
+    playerStats={pa:pa,ab:ab,h:h,hr:hr,rbi:rbi,bb:bb,k:k,sb:sb,avg:avg,slg:slg,obp:obp,ops:ops,g:allGames.length};
+  }
 
   // 画像保存
-  const capture = async () => {
+  function capture() {
     if(!cardRef.current||capturing) return;
     setCapturing(true);
-    try {
-      const canvas = await html2canvas(cardRef.current, {
-        scale:3, useCORS:true, backgroundColor:"#000",
-        logging:false,
-        onclone:(doc)=>{
-          // フォント読み込み待ち
-          doc.fonts && doc.fonts.ready;
-        }
-      });
-      const url = canvas.toDataURL("image/png");
-      const a = document.createElement("a");
-      a.href = url; a.download = "owapro_score.png"; a.click();
-    } catch(e){ alert("画像の保存に失敗しました: "+e.message); }
-    finally { setCapturing(false); }
-  };
+    html2canvas(cardRef.current,{scale:3,useCORS:true,backgroundColor:"#000",logging:false})
+      .then(function(canvas){
+        var url=canvas.toDataURL("image/png");
+        var a=document.createElement("a");
+        a.href=url; a.download="owapro_card.png"; a.click();
+        setCapturing(false);
+      }).catch(function(e){alert("保存失敗: "+e.message); setCapturing(false);});
+  }
 
-  // ====== スタイル定数 ======
-  const GOLD = "#ffd700"; const GDARK = "#3a2000";
-  const sCard = {width:360,background:"#000",borderRadius:6,overflow:"hidden",
-    fontFamily:"'Noto Sans JP',sans-serif",position:"relative"};
-  const sBanner = (color1=GOLD,color2="#e8b800") => ({
-    background:`linear-gradient(90deg,#b8900a,${color1},${color2},${color1},#b8900a)`,
-    padding:"3px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"
-  });
-  const sBannerBlue = {background:"linear-gradient(90deg,#0a3a4a,#7dd3fc,#0a6a8a,#7dd3fc,#0a3a4a)",
+  // スタイル
+  var GOLD="#ffd700";
+  var sOverlay={position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.93)",
+    display:"flex",flexDirection:"column",alignItems:"center",overflowY:"auto",padding:"16px 12px 40px"};
+  var sCard={width:360,background:"#000",borderRadius:6,overflow:"hidden",
+    fontFamily:"'Noto Sans JP',sans-serif"};
+  var sBanner={background:"linear-gradient(90deg,#b8900a,"+GOLD+",#e8b800,"+GOLD+",#b8900a)",
     padding:"3px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"};
-  const sBL = {fontFamily:"'Oswald',sans-serif",fontSize:8,fontWeight:700,color:"#000",letterSpacing:2};
-  const sBR = {fontFamily:"'Noto Sans JP',sans-serif",fontSize:7,fontWeight:900,color:GDARK};
-  const sSB = {border:"1px solid #181818",borderRadius:2,overflow:"hidden",margin:"0 10px 5px"};
-  const sSBR = {display:"flex"};
-  const sSBC = (flex=1,extra={})=>({flex,textAlign:"center",padding:"3px 1px",
-    fontFamily:"'Bebas Neue',sans-serif",fontSize:12,...extra});
-  const sLU = {display:"flex",gap:5,padding:"0 10px 5px"};
-  const sLUHdr = (col)=>({fontFamily:"'Bebas Neue',sans-serif",fontSize:7,letterSpacing:2,
-    padding:"2px 4px",marginBottom:2,borderRadius:1,
-    background:col==="#ffd700"?"#3a2800":"#1a1a1a",color:col});
-  const sLUR = {display:"flex",alignItems:"center",gap:3,padding:"1.5px 2px",borderBottom:"1px solid #0a0a0a"};
-  const sStamp = (col)=>({fontFamily:"'Bebas Neue',sans-serif",fontSize:12,letterSpacing:4,
-    padding:"4px 22px",border:`2px solid ${col}`,borderRadius:2,color:col,
-    background:`${col}10`,textShadow:`0 0 12px ${col}99`});
-  const sScoreNum = (col)=>({fontFamily:"'Bebas Neue',sans-serif",fontSize:64,lineHeight:1,color:col,
-    textShadow:`0 0 15px ${col}bb,0 0 40px ${col}44`});
+  var sSBRow={display:"flex"};
 
-  // ====== コーナー装飾 ======
-  const Corner = ({col=GOLD})=>React.createElement(React.Fragment,null,
-    ...["tl","tr","bl","br"].map(pos=>React.createElement("div",{key:pos,style:{
-      position:"absolute",width:13,height:13,
-      ...(pos==="tl"?{top:5,left:5,borderTop:`2px solid ${col}`,borderLeft:`2px solid ${col}`}:{}),
-      ...(pos==="tr"?{top:5,right:5,borderTop:`2px solid ${col}`,borderRight:`2px solid ${col}`}:{}),
-      ...(pos==="bl"?{bottom:5,left:5,borderBottom:`2px solid ${col}`,borderLeft:`2px solid ${col}`}:{}),
-      ...(pos==="br"?{bottom:5,right:5,borderBottom:`2px solid ${col}`,borderRight:`2px solid ${col}`}:{}),
-    }}))
-  );
+  // スコアボードセル
+  function SBCell(props2){
+    return React.createElement("div",{style:{flex:props2.flex||1,textAlign:"center",padding:"3px 1px",
+      fontFamily:"'Bebas Neue',sans-serif",fontSize:props2.big?14:12,
+      borderLeft:props2.borderLeft?"1px solid #181818":"none",
+      color:props2.col||"#ccc",background:props2.bg||"transparent",
+      textAlign:props2.left?"left":"center",paddingLeft:props2.left?6:1,
+      fontFamily:props2.jp?"'Noto Sans JP',sans-serif":"'Bebas Neue',sans-serif",
+      fontWeight:props2.jp?700:400,fontSize:props2.jp?8:props2.big?14:12}},props2.children);
+  }
 
-  // ====== スコアボード行レンダリング ======
-  const renderSBRow = (label, scores, total, col, bg) =>
-    React.createElement("div",{style:{...sSBR,background:bg}},
-      React.createElement("div",{style:{...sSBC(2.2,{textAlign:"left",paddingLeft:6,
-        fontFamily:"'Noto Sans JP',sans-serif",fontSize:8,fontWeight:700,color:col})},label},
-      ...innArr.map(i=>React.createElement("div",{key:i,style:{...sSBC(1,{color:col})}},scores[i]??"")),
-      React.createElement("div",{style:{...sSBC(1.3,{fontSize:14,borderLeft:"1px solid #181818",color:col})}},total)
+  // 成績セル
+  function StatCell(props2){
+    return React.createElement("div",{style:{flex:1,textAlign:"center",padding:"7px 2px",borderRight:"1px solid #111"}}
+      ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:7,color:"#555",letterSpacing:1,marginBottom:3}},props2.lbl)
+      ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,lineHeight:1,color:props2.col||"#ddd"}},props2.val!=null?props2.val:"—")
     );
+  }
 
-  // ====== ゲームカードレンダリング ======
-  const renderGameCard = () => {
-    if(!g) return React.createElement("div",{style:{color:"#666",textAlign:"center",padding:40}},"試合データなし");
-    const stampColors = {VICTORY:GOLD,"WIN!!":"#18b257","LOSE...":"#ff4444","DRAW":"#888","VICTORY!!!!!":GOLD};
-    const sCol = stampColors[stampType]||GOLD;
-    const awayLU = g.awayLineup||[];
-    const homeLU = g.homeLineup||[];
-
-    return React.createElement("div",{ref:cardRef,style:{...sCard,
-      background:"radial-gradient(ellipse at 50% 60%,#050a18 0%,#000208 60%,#000 100%)"}}
-      // バナー
-      ,React.createElement("div",{style:sBanner()},
-        React.createElement("div",{style:sBL},"⚾ FINAL SCORE — "+(g.date||"")+(g.place?" @ "+g.place:""))
-        ,React.createElement("div",{style:sBR},"簡単！みんなの野球記録")
+  // ゲームカード
+  function GameCard(){
+    var stampColors={"VICTORY":GOLD,"WIN!!":"#18b257","LOSE...":"#ff4444","DRAW":"#888","VICTORY!!!!!":GOLD};
+    var sc=stampColors[stamp]||GOLD;
+    var awLU=(game&&game.awayLineup)||[];
+    var hmLU=(game&&game.homeLineup)||[];
+    return React.createElement("div",{ref:cardRef,style:Object.assign({},sCard,{
+      background:"radial-gradient(ellipse at 50% 60%,#050a18 0%,#000208 60%,#000 100%)"})}
+      ,React.createElement("div",{style:sBanner}
+        ,React.createElement("div",{style:{fontFamily:"'Oswald',sans-serif",fontSize:8,fontWeight:700,color:"#000",letterSpacing:2}}
+          ,"⚾ FINAL SCORE"+(game&&game.date?" — "+game.date:"")+(game&&game.place?" @ "+game.place:""))
+        ,React.createElement("div",{style:{fontFamily:"'Noto Sans JP',sans-serif",fontSize:7,fontWeight:900,color:"#3a2000"}},"簡単！みんなの野球記録")
       )
-      // チーム名＋スコア
       ,React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 12px 5px",gap:4}}
-        ,React.createElement("div",{style:{flex:1}}
-          ,React.createElement("div",{style:{fontSize:14,fontWeight:900,color:GOLD,textShadow:"0 0 8px #ffd70044"}},g.awayTeam)
-        )
+        ,React.createElement("div",{style:{flex:1,fontSize:14,fontWeight:900,color:GOLD}},game&&game.awayTeam)
         ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:3,flexShrink:0}}
-          ,React.createElement("div",{style:sScoreNum(GOLD)},awayScore)
+          ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:64,lineHeight:1,color:GOLD,textShadow:"0 0 15px #ffd700bb"}},awayScore)
           ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:"#2a2a2a"}},"—")
-          ,React.createElement("div",{style:sScoreNum("#fff")},homeScore)
+          ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:64,lineHeight:1,color:"#fff",textShadow:"0 0 15px #ffffff88"}},homeScore)
         )
-        ,React.createElement("div",{style:{flex:1,textAlign:"right"}}
-          ,React.createElement("div",{style:{fontSize:14,fontWeight:900,color:"#fff"}},g.homeTeam)
+        ,React.createElement("div",{style:{flex:1,fontSize:14,fontWeight:900,color:"#fff",textAlign:"right"}},game&&game.homeTeam)
+      )
+      ,React.createElement("div",{style:{border:"1px solid #181818",borderRadius:2,overflow:"hidden",margin:"0 10px 5px"}}
+        ,React.createElement("div",{style:Object.assign({},sSBRow,{background:"#050505"})}
+          ,React.createElement("div",{style:{flex:2.2,padding:"3px 6px",fontFamily:"'Bebas Neue',sans-serif",fontSize:9,color:"#444"}})
+          ,innArr.map(function(i){return React.createElement("div",{key:i,style:{flex:1,textAlign:"center",padding:"3px 1px",fontFamily:"'Bebas Neue',sans-serif",fontSize:9,color:"#444"}},i);})
+          ,React.createElement("div",{style:{flex:1.3,textAlign:"center",padding:"3px 1px",borderLeft:"1px solid #181818",fontFamily:"'Bebas Neue',sans-serif",fontSize:9,color:"#444"}},"計")
+        )
+        ,React.createElement("div",{style:Object.assign({},sSBRow,{background:"#080600"})}
+          ,React.createElement("div",{style:{flex:2.2,padding:"3px 6px",fontFamily:"'Noto Sans JP',sans-serif",fontSize:8,fontWeight:700,color:GOLD}},game&&game.awayTeam)
+          ,innArr.map(function(i){return React.createElement("div",{key:i,style:{flex:1,textAlign:"center",padding:"3px 1px",fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:GOLD}},(game&&game.awayScore&&game.awayScore[i]!=null)?game.awayScore[i]:"");})
+          ,React.createElement("div",{style:{flex:1.3,textAlign:"center",padding:"3px 1px",borderLeft:"1px solid #181818",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:GOLD}},awayScore)
+        )
+        ,React.createElement("div",{style:Object.assign({},sSBRow,{background:"#060606"})}
+          ,React.createElement("div",{style:{flex:2.2,padding:"3px 6px",fontFamily:"'Noto Sans JP',sans-serif",fontSize:8,fontWeight:700,color:"#ccc"}},game&&game.homeTeam)
+          ,innArr.map(function(i){return React.createElement("div",{key:i,style:{flex:1,textAlign:"center",padding:"3px 1px",fontFamily:"'Bebas Neue',sans-serif",fontSize:12,color:"#ccc"}},(game&&game.homeScore&&game.homeScore[i]!=null)?game.homeScore[i]:"");})
+          ,React.createElement("div",{style:{flex:1.3,textAlign:"center",padding:"3px 1px",borderLeft:"1px solid #181818",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"#ccc"}},homeScore)
         )
       )
-      // スコアボード
-      ,React.createElement("div",{style:sSB}
-        ,React.createElement("div",{style:{...sSBR,background:"#050505"}},
-          React.createElement("div",{style:{...sSBC(2.2,{textAlign:"left",paddingLeft:6,color:"#444",fontSize:9})}},"")
-          ,...innArr.map(i=>React.createElement("div",{key:i,style:{...sSBC(1,{color:"#444",fontSize:9})}},i))
-          ,React.createElement("div",{style:{...sSBC(1.3,{fontSize:9,borderLeft:"1px solid #181818",color:"#444"})}},"計")
-        )
-        ,React.createElement("div",{style:{...sSBR,background:"#080600"}},
-          React.createElement("div",{style:{...sSBC(2.2,{textAlign:"left",paddingLeft:6,fontFamily:"'Noto Sans JP',sans-serif",fontSize:8,fontWeight:700,color:GOLD})}},g.awayTeam)
-          ,...innArr.map(i=>React.createElement("div",{key:i,style:{...sSBC(1,{color:GOLD})}},g.awayScore?.[i]??""))
-          ,React.createElement("div",{style:{...sSBC(1.3,{fontSize:14,borderLeft:"1px solid #181818",color:GOLD})}},awayScore)
-        )
-        ,React.createElement("div",{style:{...sSBR,background:"#060606"}},
-          React.createElement("div",{style:{...sSBC(2.2,{textAlign:"left",paddingLeft:6,fontFamily:"'Noto Sans JP',sans-serif",fontSize:8,fontWeight:700,color:"#ccc"})}},g.homeTeam)
-          ,...innArr.map(i=>React.createElement("div",{key:i,style:{...sSBC(1,{color:"#ccc"})}},g.homeScore?.[i]??""))
-          ,React.createElement("div",{style:{...sSBC(1.3,{fontSize:14,borderLeft:"1px solid #181818",color:"#ccc"})}},homeScore)
-        )
+      ,React.createElement("div",{style:{display:"flex",justifyContent:"center",padding:"4px 0 4px"}}
+        ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:12,letterSpacing:4,
+          padding:"4px 22px",border:"2px solid "+sc,borderRadius:2,color:sc,background:"rgba(0,0,0,0.3)",
+          textShadow:"0 0 12px "+sc}},"✦ "+stamp+" ✦")
       )
-      // スタンプ
-      ,React.createElement("div",{style:{display:"flex",justifyContent:"center",padding:"5px 0 4px"}}
-        ,React.createElement("div",{style:sStamp(sCol)},"✦ "+stampType+" ✦")
-      )
-      // スタメン（cardType===A）
-      ,cardType==="A"&&React.createElement("div",{style:sLU}
+      ,cardType==="A"&&React.createElement("div",{style:{display:"flex",gap:5,padding:"0 10px 6px"}}
         ,React.createElement("div",{style:{flex:1}}
-          ,React.createElement("div",{style:sLUHdr(GOLD)},g.awayTeam+" LINEUP")
-          ,...awayLU.slice(0,9).map((p,i)=>p&&React.createElement("div",{key:i,style:sLUR}
-            ,React.createElement("span",{style:{color:"#555",fontFamily:"'Bebas Neue',sans-serif",fontSize:9,minWidth:10}},i+1)
-            ,React.createElement("span",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:8,minWidth:12,padding:"0 2px",borderRadius:1,color:GOLD,background:"#1a1000"}},p.pos?POS_ABBR[p.pos]||p.pos:"")
-            ,React.createElement("span",{style:{color:"#eee",fontSize:8,fontWeight:900,flex:1}},p.name)
-          ))
+          ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:7,letterSpacing:2,
+            padding:"2px 4px",marginBottom:2,borderRadius:1,background:"#3a2800",color:GOLD}},
+            (game&&game.awayTeam)||"AWAY")
+          ,awLU.slice(0,9).map(function(p,i){
+            if(!p) return null;
+            return React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",gap:3,
+              padding:"1.5px 2px",borderBottom:"1px solid #0a0a0a"}}
+              ,React.createElement("span",{style:{color:"#555",fontFamily:"'Bebas Neue',sans-serif",fontSize:9,minWidth:10}},i+1)
+              ,React.createElement("span",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:8,minWidth:12,
+                padding:"0 2px",borderRadius:1,color:GOLD,background:"#1a1000"}},
+                p.pos?(POS_ABBR[p.pos]||p.pos):"")
+              ,React.createElement("span",{style:{color:"#eee",fontSize:8,fontWeight:900,flex:1}},p.name)
+            );
+          })
         )
         ,React.createElement("div",{style:{flex:1}}
-          ,React.createElement("div",{style:sLUHdr("#7dd3fc")},g.homeTeam+" LINEUP")
-          ,...homeLU.slice(0,9).map((p,i)=>p&&React.createElement("div",{key:i,style:sLUR}
-            ,React.createElement("span",{style:{color:"#555",fontFamily:"'Bebas Neue',sans-serif",fontSize:9,minWidth:10}},i+1)
-            ,React.createElement("span",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:8,minWidth:12,padding:"0 2px",borderRadius:1,color:"#7dd3fc",background:"#00101a"}},p.pos?POS_ABBR[p.pos]||p.pos:"")
-            ,React.createElement("span",{style:{color:"#eee",fontSize:8,fontWeight:900,flex:1}},p.name)
-          ))
+          ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:7,letterSpacing:2,
+            padding:"2px 4px",marginBottom:2,borderRadius:1,background:"#1a1a1a",color:"#aaa"}},
+            (game&&game.homeTeam)||"HOME")
+          ,hmLU.slice(0,9).map(function(p,i){
+            if(!p) return null;
+            return React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",gap:3,
+              padding:"1.5px 2px",borderBottom:"1px solid #0a0a0a"}}
+              ,React.createElement("span",{style:{color:"#555",fontFamily:"'Bebas Neue',sans-serif",fontSize:9,minWidth:10}},i+1)
+              ,React.createElement("span",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:8,minWidth:12,
+                padding:"0 2px",borderRadius:1,color:"#7dd3fc",background:"#00101a"}},
+                p.pos?(POS_ABBR[p.pos]||p.pos):"")
+              ,React.createElement("span",{style:{color:"#eee",fontSize:8,fontWeight:900,flex:1}},p.name)
+            );
+          })
         )
       )
     );
-  };
+  }
 
-  // ====== 個人成績カード ======
-  const renderPlayerCard = () => {
-    const isPit = mode==="player_pit";
-    const accentCol = isPit?"#7dd3fc":GOLD;
-    const bg = isPit
-      ?"radial-gradient(ellipse at 60% 30%,#00080e,#000 70%)"
-      :"radial-gradient(ellipse at 60% 30%,#080814,#000 70%)";
-    const bannerStyle = isPit?sBannerBlue:sBanner();
-    const bannerTextCol = isPit?"#001820":"#000";
-    const bannerSubCol = isPit?"#001820":GDARK;
-    const ps = playerStats;
-
-    const StatCell = ({lbl,val,col="#ddd"})=>React.createElement("div",{
-      style:{flex:1,textAlign:"center",padding:"7px 2px",borderRight:"1px solid #111"}}
-      ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:7,color:"#555",letterSpacing:1,marginBottom:3}},lbl)
-      ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,lineHeight:1,color:col}},val??"—")
-    );
-
-    return React.createElement("div",{ref:cardRef,style:{...sCard,background:bg}}
-      ,React.createElement("div",{style:bannerStyle}
-        ,React.createElement("div",{style:{...sBL,color:bannerTextCol}},"⚾ SEASON STATS")
-        ,React.createElement("div",{style:{...sBR,color:bannerSubCol}},"簡単！みんなの野球記録")
+  // 個人成績カード
+  function PlayerCard(){
+    var isPit=mode==="player_pit";
+    var ac=isPit?"#7dd3fc":GOLD;
+    var ps=playerStats;
+    var bannerBg=isPit
+      ?"linear-gradient(90deg,#0a3a4a,#7dd3fc,#0a6a8a,#7dd3fc,#0a3a4a)"
+      :"linear-gradient(90deg,#b8900a,"+GOLD+",#e8b800,"+GOLD+",#b8900a)";
+    var bannerTextCol=isPit?"#001820":"#000";
+    return React.createElement("div",{ref:cardRef,style:Object.assign({},sCard,{
+      background:isPit?"radial-gradient(ellipse at 60% 30%,#00080e,#000 70%)":"radial-gradient(ellipse at 60% 30%,#080814,#000 70%)"})}
+      ,React.createElement("div",{style:{background:bannerBg,padding:"3px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}
+        ,React.createElement("div",{style:{fontFamily:"'Oswald',sans-serif",fontSize:8,fontWeight:700,color:bannerTextCol,letterSpacing:2}},"⚾ SEASON STATS")
+        ,React.createElement("div",{style:{fontFamily:"'Noto Sans JP',sans-serif",fontSize:7,fontWeight:900,color:bannerTextCol}},"簡単！みんなの野球記録")
       )
-      // 写真＋名前
       ,React.createElement("div",{style:{display:"flex",height:138,position:"relative",zIndex:2}}
-        // 写真
         ,React.createElement("div",{style:{width:110,flexShrink:0,
           background:"linear-gradient(160deg,#0d0d1a,#14080a,#080a14)",
           display:"flex",alignItems:"center",justifyContent:"center",
-          borderRight:`2px solid ${accentCol}`,position:"relative",overflow:"hidden"}}
-          ,React.createElement(Corner,{col:accentCol})
+          borderRight:"2px solid "+ac,position:"relative",overflow:"hidden"}}
+          ,React.createElement("div",{style:{position:"absolute",top:5,left:5,width:13,height:13,borderTop:"2px solid "+ac,borderLeft:"2px solid "+ac}})
+          ,React.createElement("div",{style:{position:"absolute",top:5,right:5,width:13,height:13,borderTop:"2px solid "+ac,borderRight:"2px solid "+ac}})
+          ,React.createElement("div",{style:{position:"absolute",bottom:5,left:5,width:13,height:13,borderBottom:"2px solid "+ac,borderLeft:"2px solid "+ac}})
+          ,React.createElement("div",{style:{position:"absolute",bottom:5,right:5,width:13,height:13,borderBottom:"2px solid "+ac,borderRight:"2px solid "+ac}})
           ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:9,color:"#1e1e1e",letterSpacing:2}},"PHOTO")
         )
-        // 名前
         ,React.createElement("div",{style:{flex:1,minWidth:0,display:"flex",flexDirection:"column",
           justifyContent:"center",padding:"10px 10px 10px 12px",
           background:"linear-gradient(135deg,#050510,#000)",overflow:"hidden"}}
           ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:9,
-            letterSpacing:3,color:accentCol,opacity:0.65,marginBottom:6,whiteSpace:"nowrap"}},posLabel)
+            letterSpacing:3,color:ac,opacity:0.65,marginBottom:6,whiteSpace:"nowrap"}},posLabel)
           ,React.createElement("div",{style:{overflow:"hidden",width:"100%",marginBottom:8}}
             ,React.createElement("div",{style:{fontWeight:900,color:"#fff",whiteSpace:"nowrap",
-              fontSize:40,lineHeight:1,display:"inline-block",transformOrigin:"left center",
+              fontSize:40,lineHeight:1,transformOrigin:"left center",
               textShadow:"0 0 20px rgba(255,255,255,0.15)",letterSpacing:1},
-              ref:(el)=>{
+              ref:function(el){
                 if(!el) return;
                 el.style.transform="scaleX(1)";
-                requestAnimationFrame(()=>{
-                  const w=el.parentElement?.clientWidth||200;
-                  if(el.scrollWidth>w) el.style.transform=`scaleX(${w/el.scrollWidth})`;
-                });
+                setTimeout(function(){
+                  var w=el.parentElement?el.parentElement.clientWidth:200;
+                  if(el.scrollWidth>w) el.style.transform="scaleX("+w/el.scrollWidth+")";
+                },50);
               }
-            },selPlayer?selPlayer.name:"選手名")
+            },selPlayer?selPlayer.name:"選手を選んでください")
           )
-          ,React.createElement("div",{style:{fontSize:9,color:"#666",fontWeight:700}},myTeam?.name||"")
+          ,React.createElement("div",{style:{fontSize:9,color:"#666",fontWeight:700}},myTeam?myTeam.name:"")
         )
       )
-      // 成績グリッド
       ,React.createElement("div",{style:{position:"relative",zIndex:2,margin:"6px 10px 8px",
         border:"1px solid #1c1c1c",borderRadius:3,overflow:"hidden"}}
-        ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:8,
-          letterSpacing:3,padding:"3px 8px",borderBottom:"1px solid #1c1c1c",
-          color:accentCol,background:isPit?"#000810":"#0a0800"}},
-          isPit?"PITCHING STATS":"BATTING STATS")
-        ,isPit
-          // 投手成績（簡易）
-          ?React.createElement(React.Fragment,null
-            ,React.createElement("div",{style:{display:"flex",borderBottom:"1px solid #111"}}
-              ,React.createElement(StatCell,{lbl:"ERA",val:"-",col:"#4ade80"})
-              ,React.createElement(StatCell,{lbl:"G",val:"-",col:"#ddd"})
-              ,React.createElement(StatCell,{lbl:"IP",val:"-",col:"#ddd"})
-              ,React.createElement(StatCell,{lbl:"W",val:"-",col:GOLD})
-              ,React.createElement(StatCell,{lbl:"L",val:"-",col:"#f87171"})
-              ,React.createElement("div",{style:{flex:1,textAlign:"center",padding:"7px 2px"}})
-            )
-            ,React.createElement("div",{style:{display:"flex"}}
-              ,React.createElement(StatCell,{lbl:"K",val:"-",col:"#7dd3fc"})
-              ,React.createElement(StatCell,{lbl:"BB",val:"-",col:"#ddd"})
-              ,React.createElement(StatCell,{lbl:"H",val:"-",col:"#ddd"})
-              ,React.createElement(StatCell,{lbl:"ER",val:"-",col:"#f87171"})
-              ,React.createElement(StatCell,{lbl:"WHIP",val:"-",col:"#4ade80"})
-              ,React.createElement(StatCell,{lbl:"K/9",val:"-",col:"#c084fc"})
-            )
-          )
-          // 打撃成績
-          :React.createElement(React.Fragment,null
-            ,React.createElement("div",{style:{display:"flex",borderBottom:"1px solid #111"}}
-              ,React.createElement(StatCell,{lbl:"AVG",val:ps?.avg,col:GOLD})
-              ,React.createElement(StatCell,{lbl:"G",val:ps?.g,col:"#ddd"})
-              ,React.createElement(StatCell,{lbl:"AB",val:ps?.ab,col:"#ddd"})
-              ,React.createElement(StatCell,{lbl:"H",val:ps?.h,col:GOLD})
-              ,React.createElement(StatCell,{lbl:"HR",val:ps?.hr,col:"#f87171"})
-              ,React.createElement(StatCell,{lbl:"RBI",val:ps?.rbi,col:"#7dd3fc"})
-            )
-            ,React.createElement("div",{style:{display:"flex"}}
-              ,React.createElement(StatCell,{lbl:"OBP",val:ps?.obp,col:"#4ade80"})
-              ,React.createElement(StatCell,{lbl:"SLG",val:ps?.slg,col:"#c084fc"})
-              ,React.createElement(StatCell,{lbl:"OPS",val:ps?.ops,col:GOLD})
-              ,React.createElement(StatCell,{lbl:"BB",val:ps?.bb,col:"#ddd"})
-              ,React.createElement(StatCell,{lbl:"K",val:ps?.k,col:"#f87171"})
-              ,React.createElement(StatCell,{lbl:"SB",val:ps?.sb,col:"#7dd3fc"})
-            )
-          )
-      )
-    );
-  };
-
-  // ====== モーダルUI ======
-  return React.createElement("div",{
-    style:{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.92)",
-      display:"flex",flexDirection:"column",alignItems:"center",overflowY:"auto",
-      padding:"16px 12px 32px"},
-    onClick:(e)=>{if(e.target===e.currentTarget)onClose();}
-  }
-    // ヘッダー
-    ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:16,width:"100%",maxWidth:380}}
-      ,React.createElement("div",{style:{fontSize:14,fontWeight:900,color:"#e9f0ea",flex:1}},"📸 シェアカード作成")
-      ,React.createElement("button",{onClick:onClose,style:{background:"none",border:"none",color:"#666",fontSize:18,cursor:"pointer"}},"✕")
-    )
-    // モード選択
-    ,React.createElement("div",{style:{display:"flex",gap:6,marginBottom:12,width:"100%",maxWidth:380}}
-      ,...[["game","⚾ 試合結果"],["player_bat","🏏 打者成績"],["player_pit","⚾ 投手成績"]].map(([m,lbl])=>
-        React.createElement("button",{key:m,onClick:()=>setMode(m),
-          style:{flex:1,padding:"8px 4px",borderRadius:8,border:"none",cursor:"pointer",
-            fontSize:11,fontWeight:700,
-            background:mode===m?"#18b257":"#122016",color:mode===m?"#fff":"#4b6052"}}
-          ,lbl)
-      )
-    )
-    // 試合カード設定
-    ,mode==="game"&&React.createElement(React.Fragment,null
-      ,React.createElement("div",{style:{display:"flex",gap:6,marginBottom:8,width:"100%",maxWidth:380}}
-        ,React.createElement("div",{style:{fontSize:11,color:"#74897b",alignSelf:"center",marginRight:4}},"スタメン")
-        ,React.createElement("button",{onClick:()=>setCardType("A"),
-          style:{flex:1,padding:"6px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
-            background:cardType==="A"?"#1a56a0":"#0c160e",color:cardType==="A"?"#fff":"#4b6052"}},"あり")
-        ,React.createElement("button",{onClick:()=>setCardType("B"),
-          style:{flex:1,padding:"6px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
-            background:cardType==="B"?"#1a56a0":"#0c160e",color:cardType==="B"?"#fff":"#4b6052"}},"なし")
-      )
-      ,React.createElement("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginBottom:12,width:"100%",maxWidth:380}}
-        ,...["VICTORY","WIN!!","LOSE...","DRAW","VICTORY!!!!!"].map(s=>
-          React.createElement("button",{key:s,onClick:()=>setStamp(s),
-            style:{flex:"1 0 auto",padding:"5px 8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:10,fontWeight:700,
-              background:stampType===s?"#c8a400":"#0c160e",color:stampType===s?"#000":"#4b6052"}}
-            ,s)
+        ,React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:8,letterSpacing:3,
+          padding:"3px 8px",borderBottom:"1px solid #1c1c1c",
+          color:ac,background:isPit?"#000810":"#0a0800"}},isPit?"PITCHING STATS":"BATTING STATS")
+        ,React.createElement("div",{style:{display:"flex",borderBottom:"1px solid #111"}}
+          ,React.createElement(StatCell,{lbl:"AVG",val:ps?ps.avg:null,col:GOLD})
+          ,React.createElement(StatCell,{lbl:"G",val:ps?ps.g:null,col:"#ddd"})
+          ,React.createElement(StatCell,{lbl:"AB",val:ps?ps.ab:null,col:"#ddd"})
+          ,React.createElement(StatCell,{lbl:"H",val:ps?ps.h:null,col:GOLD})
+          ,React.createElement(StatCell,{lbl:"HR",val:ps?ps.hr:null,col:"#f87171"})
+          ,React.createElement("div",{style:{flex:1,textAlign:"center",padding:"7px 2px"}})
+        )
+        ,React.createElement("div",{style:{display:"flex"}}
+          ,React.createElement(StatCell,{lbl:"OBP",val:ps?ps.obp:null,col:"#4ade80"})
+          ,React.createElement(StatCell,{lbl:"SLG",val:ps?ps.slg:null,col:"#c084fc"})
+          ,React.createElement(StatCell,{lbl:"OPS",val:ps?ps.ops:null,col:GOLD})
+          ,React.createElement(StatCell,{lbl:"BB",val:ps?ps.bb:null,col:"#ddd"})
+          ,React.createElement(StatCell,{lbl:"K",val:ps?ps.k:null,col:"#f87171"})
+          ,React.createElement(StatCell,{lbl:"SB",val:ps?ps.sb:null,col:"#7dd3fc"})
         )
       )
+    );
+  }
+
+  return React.createElement("div",{style:sOverlay,
+    onClick:function(e){if(e.target===e.currentTarget)onClose();}}
+    ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:16,width:"100%",maxWidth:380}}
+      ,React.createElement("div",{style:{fontSize:14,fontWeight:900,color:"#e9f0ea",flex:1}},"📸 シェアカード作成")
+      ,React.createElement("button",{onClick:onClose,style:{background:"none",border:"none",color:"#666",fontSize:20,cursor:"pointer"}},"✕")
     )
-    // 個人成績設定
-    ,(mode==="player_bat"||mode==="player_pit")&&React.createElement(React.Fragment,null
-      // 選手選択
+    ,React.createElement("div",{style:{display:"flex",gap:6,marginBottom:12,width:"100%",maxWidth:380}}
+      ,["game","player_bat"].map(function(m){
+        var lbl=m==="game"?"⚾ 試合結果":"🏏 打者成績";
+        return React.createElement("button",{key:m,onClick:function(){setMode(m);},
+          style:{flex:1,padding:"8px 4px",borderRadius:8,border:"none",cursor:"pointer",
+            fontSize:11,fontWeight:700,
+            background:mode===m?"#18b257":"#122016",color:mode===m?"#fff":"#4b6052"}},lbl);
+      })
+    )
+    ,mode==="game"&&React.createElement(React.Fragment,null
+      ,React.createElement("div",{style:{display:"flex",gap:6,marginBottom:8,width:"100%",maxWidth:380,alignItems:"center"}}
+        ,React.createElement("div",{style:{fontSize:11,color:"#74897b"}},"スタメン")
+        ,["A","B"].map(function(t){
+          return React.createElement("button",{key:t,onClick:function(){setCardType(t);},
+            style:{flex:1,padding:"6px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
+              background:cardType===t?"#1a56a0":"#0c160e",color:cardType===t?"#fff":"#4b6052"}},
+            t==="A"?"あり":"なし");
+        })
+      )
+      ,React.createElement("div",{style:{display:"flex",gap:4,flexWrap:"wrap",marginBottom:12,width:"100%",maxWidth:380}}
+        ,["VICTORY","WIN!!","LOSE...","DRAW","VICTORY!!!!!"].map(function(s){
+          return React.createElement("button",{key:s,onClick:function(){setStamp(s);},
+            style:{flex:"1 0 auto",padding:"5px 8px",borderRadius:6,border:"none",cursor:"pointer",
+              fontSize:10,fontWeight:700,
+              background:stamp===s?"#c8a400":"#0c160e",color:stamp===s?"#000":"#4b6052"}},s);
+        })
+      )
+    )
+    ,mode==="player_bat"&&React.createElement(React.Fragment,null
       ,React.createElement("div",{style:{width:"100%",maxWidth:380,marginBottom:8}}
         ,React.createElement("div",{style:{fontSize:10,color:"#74897b",marginBottom:6}},"選手を選ぶ")
         ,React.createElement("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}}
-          ,...playerList.map((p,i)=>
-            React.createElement("button",{key:i,onClick:()=>setSelPlayer(p),
+          ,playerList.map(function(p,i){
+            return React.createElement("button",{key:i,onClick:function(){setSelPlayer(p);},
               style:{padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
-                background:selPlayer?.name===p.name?"#c8a400":"#0c160e",
-                color:selPlayer?.name===p.name?"#000":"#9fb3a5"}}
-              ,p.name)
-          )
+                background:(selPlayer&&selPlayer.name===p.name)?"#c8a400":"#0c160e",
+                color:(selPlayer&&selPlayer.name===p.name)?"#000":"#9fb3a5"}},p.name);
+          })
         )
       )
-      // ポジション選択
       ,React.createElement("div",{style:{width:"100%",maxWidth:380,marginBottom:12}}
         ,React.createElement("div",{style:{fontSize:10,color:"#74897b",marginBottom:6}},"ポジション")
         ,React.createElement("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}}
-          ,...PLAYER_POS_OPTIONS.map(pos=>
-            React.createElement("button",{key:pos,onClick:()=>setPosLabel(pos),
+          ,PLAYER_POS_OPTIONS.map(function(pos){
+            return React.createElement("button",{key:pos,onClick:function(){setPosLabel(pos);},
               style:{padding:"5px 8px",borderRadius:6,border:"none",cursor:"pointer",fontSize:10,fontWeight:700,
                 background:posLabel===pos?"#c8a400":"#0c160e",
-                color:posLabel===pos?"#000":"#9fb3a5"}}
-              ,pos)
-          )
+                color:posLabel===pos?"#000":"#9fb3a5"}},pos);
+          })
         )
       )
     )
-    // カードプレビュー
-    ,React.createElement("div",{style:{width:360,marginBottom:16,
-      boxShadow:"0 0 0 3px #111,0 0 0 5px #444,0 0 0 7px #111,0 0 30px rgba(0,0,0,0.8)",
-      borderRadius:6,overflow:"hidden"}}
-      ,mode==="game"?renderGameCard():renderPlayerCard()
+    ,React.createElement("div",{style:{width:360,marginBottom:16,borderRadius:6,overflow:"hidden",
+      boxShadow:"0 0 0 3px #111,0 0 0 5px #444,0 0 30px rgba(0,0,0,0.8)"}}
+      ,mode==="game"?React.createElement(GameCard,null):React.createElement(PlayerCard,null)
     )
-    // 保存ボタン
     ,React.createElement("button",{onClick:capture,disabled:capturing,
       style:{width:"100%",maxWidth:380,padding:"14px",borderRadius:12,border:"none",
         background:capturing?"#2a4a2a":"#18b257",color:"#fff",fontSize:15,fontWeight:900,cursor:"pointer"}}
