@@ -3611,7 +3611,69 @@ function App() {
       result[name]={g:m.games.size,w:m.w,l:m.l,s:m.s,ip:ipStr,er:m.er,h:m.h,bb:m.bb,k:m.k,hbp:m.hbp,era:era,whip:whip,k9:k9};
     });
     return result;
-  },[myTeam,history,game]); 
+  },[myTeam,history,game]);
+
+  // シェアカード用：打撃通算成績をメインコンポーネントで計算
+  const shareBattingMap = React.useMemo(function(){
+    if(!myTeam||!myTeam.name) return {};
+    var _hist=history||[];
+    var _histWithCur;
+    if(game&&game.finished&&game.id&&!_hist.some(function(h){return h.id===game.id;})){
+      _histWithCur=[game].concat(_hist);
+    } else if(game&&game.finished&&game.id){
+      var _inHist=_hist.find(function(h){return h.id===game.id;});
+      if(_inHist&&((game._ts||0)>(_inHist._ts||0))){
+        _histWithCur=[game].concat(_hist.filter(function(h){return h.id!==game.id;}));
+      } else { _histWithCur=_hist; }
+    } else { _histWithCur=_hist; }
+    var allG=_histWithCur.filter(function(g){return g&&g.awayLineup&&g.homeLineup&&g.finished;});
+    var map={};
+    allG.forEach(function(fg){
+      ["away","home"].forEach(function(side){
+        if(fg[side+"Team"]!==myTeam.name) return;
+        var lu=fg[side+"Lineup"]||[];
+        lu.forEach(function(p){
+          var allV=[p].concat(p._subOuts||[]);
+          allV.forEach(function(v){
+            if(!v||!v.name||v.name.startsWith("選手")) return;
+            if(!map[v.name]) map[v.name]={pa:0,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,sb:0,sac:0,sf:0,ci:0,games:new Set()};
+            var m=map[v.name];
+            m.games.add(fg.id);
+            m.rbi+=(v.rbi||0); m.sb+=(v.sb||0);
+            Object.values(v.atBats||{}).forEach(function(inn){
+              var abs=Array.isArray(inn)?inn:[inn];
+              abs.forEach(function(ab){
+                if(!ab||!ab.code) return;
+                var c=ab.code;
+                m.pa++;
+                if(["BB","IBB","HBP","KW","CI","SAC","SF"].indexOf(c)<0) m.ab++;
+                if(["H1","H2","H3","HR"].indexOf(c)>=0){m.h++;if(c==="H2")m.h2++;if(c==="H3")m.h3++;if(c==="HR")m.hr++;}
+                if(["BB","IBB"].indexOf(c)>=0) m.bb++;
+                if(c==="HBP") m.hbp++;
+                if(["K","KL"].indexOf(c)>=0) m.k++;
+                if(c==="SAC") m.sac++;
+                if(c==="SF") m.sf++;
+                if(c==="CI") m.ci++;
+              });
+            });
+          });
+        });
+      });
+    });
+    var result={};
+    Object.keys(map).forEach(function(name){
+      var m=map[name];
+      var avg=m.ab>0?(m.h/m.ab).toFixed(3).replace("0.","."):".000";
+      var tb=(m.h-m.h2-m.h3-m.hr)+m.h2*2+m.h3*3+m.hr*4;
+      var slg=m.ab>0?(tb/m.ab).toFixed(3).replace("0.","."):".---";
+      var obpD=m.pa-m.sac-m.ci;
+      var obp=obpD>0?((m.h+m.bb+m.hbp)/obpD).toFixed(3).replace("0.","."):".---";
+      var ops=obpD>0?(parseFloat(obp)+parseFloat(slg)).toFixed(3).replace("0.","."):".---";
+      result[name]={g:m.games.size,pa:m.pa,ab:m.ab,h:m.h,hr:m.hr,rbi:m.rbi,bb:m.bb,k:m.k,sb:m.sb,avg:avg,slg:slg,obp:obp,ops:ops};
+    });
+    return result;
+  },[myTeam,history,game]);
+
   const curTeam   = game.half==="top"?"away":"home";
   const curLabel  = game.half==="top"?game.awayTeam:game.homeTeam;
   const curLineup = game.half==="top"?game.awayLineup:game.homeLineup;
@@ -4016,7 +4078,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.70")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.71")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4100,7 +4162,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.70")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.71")
         )
 
         // ===== 新規チーム作成 =====
@@ -4338,19 +4400,20 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.70",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.71",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
+                  {ver:"v472.71",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -5688,19 +5751,20 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.70",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.70",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.71",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
+                  {ver:"v472.71",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.71",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -5987,6 +6051,7 @@ function App() {
               game:game, history:history, myTeam:myTeam,
               tournaments:tournaments,
               sharePitcherMap:sharePitcherMap,
+              shareBattingMap:shareBattingMap,
               onClose:function(){setTab("top");},
               asTab:true
             })
@@ -7812,6 +7877,7 @@ function ShareCardModal(props) {
   var onClose = props.onClose;
   var asTab = props.asTab || false;
   var sharePitcherMap = props.sharePitcherMap || {};
+  var shareBattingMap = props.shareBattingMap || {};
 
   var modeState = useState("game");
   var mode = modeState[0]; var setMode = modeState[1];
@@ -7833,6 +7899,8 @@ function ShareCardModal(props) {
   var photoScale = photoScaleState[0]; var setPhotoScale = photoScaleState[1];
   var photoOffsetYState = useState(50);
   var photoOffsetY = photoOffsetYState[0]; var setPhotoOffsetY = photoOffsetYState[1];
+  var photoOffsetXState = useState(50);
+  var photoOffsetX = photoOffsetXState[0]; var setPhotoOffsetX = photoOffsetXState[1];
   var captionState = useState("");
   var captionText = captionState[0]; var setCaptionText = captionState[1];
   var captionSizeState = useState(18);
@@ -7869,28 +7937,27 @@ function ShareCardModal(props) {
   var allGames = history.filter(function(g){return g&&g.awayLineup&&g.homeLineup&&g.finished;});
   var playerStats = null;
   if(selPlayer && mode==="player_bat") {
-    var _batMap = (window.__shareBatMap) || {};
-    var _batRaw = _batMap[selPlayer.name] || null;
+    // StatsTabが計算済みならwindow.__shareBatMapを優先、なければshareBattingMapを使用
+    var _batMapW = window.__shareBatMap || null;
+    var _batRawW = _batMapW ? _batMapW[selPlayer.name] : null;
+    var _batRaw = _batRawW || shareBattingMap[selPlayer.name] || null;
     if(_batRaw) {
-      // StatsTabのaggregatePlayerStats形式から取得
-      var _avg = _batRaw._avg || ".000";
-      var _slg = _batRaw._slg || ".---";
-      var _obp = _batRaw._obp || ".---";
-      var _ops = _batRaw._ops || ".---";
+      // StatsTabのaggregatePlayerStats形式（_avg等）とshareBattingMap形式（avg等）両対応
+      var _avg = _batRaw._avg || _batRaw.avg || ".000";
+      var _slg = _batRaw._slg || _batRaw.slg || ".---";
+      var _obp = _batRaw._obp || _batRaw.obp || ".---";
+      var _ops = _batRaw._ops || _batRaw.ops || ".---";
       playerStats = {
-        g:   _batRaw.games || 0,
-        pa:  _batRaw._pa   || 0,
-        ab:  _batRaw._ab   || 0,
-        h:   _batRaw._h    || 0,
-        hr:  _batRaw._hr   || 0,
+        g:   _batRaw.games || _batRaw.g || 0,
+        pa:  _batRaw._pa   || _batRaw.pa || 0,
+        ab:  _batRaw._ab   || _batRaw.ab || 0,
+        h:   _batRaw._h    || _batRaw.h  || 0,
+        hr:  _batRaw._hr   || _batRaw.hr || 0,
         rbi: _batRaw.rbi   || 0,
-        bb:  _batRaw._bb   || 0,
-        k:   _batRaw._k    || 0,
+        bb:  _batRaw._bb   || _batRaw.bb || 0,
+        k:   _batRaw._k    || _batRaw.k  || 0,
         sb:  _batRaw.sb    || 0,
-        avg: _avg,
-        slg: _slg,
-        obp: _obp,
-        ops: _ops
+        avg: _avg, slg: _slg, obp: _obp, ops: _ops
       };
     }
   }
@@ -7899,8 +7966,9 @@ function ShareCardModal(props) {
   var pitStats = null;
   if(selPlayer && mode==="player_pit") {
     // StatsTabが計算済みならwindow.__sharePitMapを優先、なければsharePitcherMapを使用
-    var _pitMap = (window.__sharePitMap) || sharePitcherMap;
-    var _raw = _pitMap[selPlayer.name] || null;
+    var _pitMapW = window.__sharePitMap || null;
+    var _rawW = _pitMapW ? _pitMapW[selPlayer.name] : null;
+    var _raw = _rawW || sharePitcherMap[selPlayer.name] || null;
     if(_raw) {
       // StatsTabのawayPit形式（ipDisp, era等あり）と
       // sharePitcherMap形式（ip, era等あり）の両方に対応
@@ -8071,7 +8139,7 @@ function ShareCardModal(props) {
         ,photoUrl
           ?React.createElement("img",{src:photoUrl,style:{
             width:photoScale+"%",height:photoScale+"%",
-            objectFit:"cover",objectPosition:"center "+photoOffsetY+"%",
+            objectFit:"cover",objectPosition:photoOffsetX+"% "+photoOffsetY+"%",
             position:"absolute",top:"50%",left:"50%",
             transform:"translate(-50%,-50%)",
             minWidth:"100%",minHeight:"100%"}})
@@ -8181,7 +8249,7 @@ function ShareCardModal(props) {
               width:(photoScale)+"%",
               height:(photoScale)+"%",
               objectFit:"cover",
-              objectPosition:"center "+photoOffsetY+"%",
+              objectPosition:photoOffsetX+"% "+photoOffsetY+"%",
               position:"absolute",
               top:"50%",left:"50%",
               transform:"translate(-50%,-50%)",
@@ -8320,12 +8388,19 @@ function ShareCardModal(props) {
               style:{flex:1,accentColor:"#ffd700"}})
             ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:36,textAlign:"right"}},photoScale+"%")
           )
-          ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}}
+          ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}}
             ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"上下位置")
             ,React.createElement("input",{type:"range",min:0,max:100,value:photoOffsetY,
               onChange:function(e){setPhotoOffsetY(Number(e.target.value));},
               style:{flex:1,accentColor:"#ffd700"}})
             ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:36,textAlign:"right"}},(photoOffsetY<=20?"上寄り":photoOffsetY>=80?"下寄り":"中央"))
+          )
+          ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}}
+            ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"左右位置")
+            ,React.createElement("input",{type:"range",min:0,max:100,value:photoOffsetX,
+              onChange:function(e){setPhotoOffsetX(Number(e.target.value));},
+              style:{flex:1,accentColor:"#ffd700"}})
+            ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:36,textAlign:"right"}},(photoOffsetX<=20?"左寄り":photoOffsetX>=80?"右寄り":"中央"))
           )
         )
       )
@@ -8384,12 +8459,19 @@ function ShareCardModal(props) {
             style:{flex:1,accentColor:"#ffd700"}})
           ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:36,textAlign:"right"}},photoScale+"%")
         )
-        ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}}
+        ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}}
           ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"上下位置")
           ,React.createElement("input",{type:"range",min:0,max:100,value:photoOffsetY,
             onChange:function(e){setPhotoOffsetY(Number(e.target.value));},
             style:{flex:1,accentColor:"#ffd700"}})
           ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:36,textAlign:"right"}},(photoOffsetY<=20?"上寄り":photoOffsetY>=80?"下寄り":"中央"))
+        )
+        ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8}}
+          ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"左右位置")
+          ,React.createElement("input",{type:"range",min:0,max:100,value:photoOffsetX,
+            onChange:function(e){setPhotoOffsetX(Number(e.target.value));},
+            style:{flex:1,accentColor:"#ffd700"}})
+          ,React.createElement("div",{style:{fontSize:10,color:"#ffd700",minWidth:36,textAlign:"right"}},(photoOffsetX<=20?"左寄り":photoOffsetX>=80?"右寄り":"中央"))
         )
       )
     )
