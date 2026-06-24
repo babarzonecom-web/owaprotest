@@ -3599,7 +3599,6 @@ function App() {
       var ipStr=ipFull+(ipRem>0?"."+ipRem:"");
       var ipNum=ipFull+ipRem/3;
       var avgInn=m.outs>0?(m.outsXinn/m.outs):9;
-      console.log("[sharePit]",name,"outs=",m.outs,"er=",m.er,"outsXinn=",m.outsXinn,"avgInn=",avgInn,"ipNum=",ipNum);
       var era=ipNum>0?(m.er*avgInn/ipNum).toFixed(2):(m.er>0?"∞":"0.00");
       var whip=ipNum>0?((m.bb+m.h)/ipNum).toFixed(2):"—";
       var k9=ipNum>0?(m.k*avgInn/ipNum).toFixed(1):"0.0";
@@ -4011,7 +4010,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.66e")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.67")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4095,7 +4094,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.66e")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.67")
         )
 
         // ===== 新規チーム作成 =====
@@ -4333,15 +4332,16 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -5679,15 +5679,16 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.66e",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.67",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -5722,7 +5723,7 @@ function App() {
         ))
 
         , tab==="stats"&&(React.createElement(React.Fragment, null
-          , React.createElement(StatsTab, {game:game, history:history, teams:teams, myTeam:myTeam, opponents:opponents, tournaments:tournaments, onExcel:(g)=>exportExcel(g), mutGame:mutGame})
+          , React.createElement(StatsTab, {game:game, history:history, teams:teams, myTeam:myTeam, opponents:opponents, tournaments:tournaments, onExcel:(g)=>exportExcel(g), mutGame:mutGame, onPitMap:function(m){window.__sharePitMap=m;}})
         ))
 
         , tab==="logout"&&(
@@ -7881,10 +7882,31 @@ function ShareCardModal(props) {
   // 投手成績集計（メインコンポーネントで計算済みのsharePitcherMapを使用）
   var pitStats = null;
   if(selPlayer && mode==="player_pit") {
-    pitStats = sharePitcherMap[selPlayer.name] || null;
-    console.log("[pitStats]", selPlayer.name, pitStats, "mapKeys:", Object.keys(sharePitcherMap));
+    // StatsTabが計算したawayPitから直接取得（最も正確）
+    var _pitMap = (window.__sharePitMap)||sharePitcherMap;
+    var _raw = _pitMap[selPlayer.name]||null;
+    if(_raw) {
+      // StatsTabのawayPit形式→シェアカード表示形式に変換
+      var _ip = _raw.ipDisp||(_raw.ip||"0");
+      var _era = _raw.era||"0.00";
+      var _whip = _raw.whip||"—";
+      pitStats = {
+        g: _raw.games||_raw.g||0,
+        w: _raw.win||_raw.w||0,
+        l: _raw.lose||_raw.l||0,
+        s: _raw.save||_raw.s||0,
+        ip: _ip,
+        er: _raw.er||0,
+        h: _raw.h||0,
+        bb: _raw.bb||0,
+        k: _raw.k||0,
+        hbp: _raw.hbp||0,
+        era: _era,
+        whip: _whip,
+        k9: _raw.k9||"0.0"
+      };
+    }
   }
-  // 以下は使わないがallGamesは打撃集計で使用
   if(false && selPlayer && mode==="player_pit" && allGames.length>0) {
     var pOuts=0,pw=0,pl=0,ps_=0,per=0,phits=0,pbbs=0,pks=0,phbp=0,pgames=new Set(),pOutsXinn=0;
     allGames.forEach(function(fg){
@@ -8763,6 +8785,14 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const homeBat = secondTeam ? aggregatePlayerStats(secondTeam) : [];
   const awayPit = aggregatePitcherStats(primaryTeam, pitchOverrides);
   const homePit = secondTeam ? aggregatePitcherStats(secondTeam, pitchOverrides) : [];
+  // ShareCardModal用：投手成績をグローバルに保存
+  React.useEffect(function(){
+    if(props.onPitMap && awayPit && awayPit.length>0){
+      var m={};
+      awayPit.forEach(function(p){ m[p.name]=p; });
+      props.onPitMap(m);
+    }
+  },[awayPit]);
   const defStats = aggregateDefenseStats(primaryTeam||null);
 
   // 直近5試合の個人成績
