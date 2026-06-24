@@ -340,20 +340,20 @@ function MiniDiamond({ bases, size=56 }) {
   return (
     React.createElement('svg', { width: size, height: size, viewBox: `0 0 ${V} ${V}`, style: {display:"block",overflow:"visible"},}
       
-      , React.createElement('polygon', { points: pts, fill: "none", stroke: "#2e4234", strokeWidth: 2,})
+      , React.createElement('polygon', { points: pts, fill: "none", stroke: "#1a5c22", strokeWidth: 2,})
       
       , React.createElement('circle', { cx: home[0], cy: home[1], r: sq * 0.85, fill: "#3b82f6",})
       
       , React.createElement('rect', { x: b1[0]-sq, y: b1[1]-sq, width: sq*2, height: sq*2, rx: 1.5,
-        fill: bases[0]?"#ffb52e":"#122016", stroke: bases[0]?"#ffb52e":"#2e4234", strokeWidth: 1.5,
+        fill: bases[0]?"#ff8c00":"#0d2010", stroke: bases[0]?"#ffb000":"#1a5c22", strokeWidth: 1.5,
         transform: `rotate(45,${b1[0]},${b1[1]})`,})
       
       , React.createElement('rect', { x: b2[0]-sq, y: b2[1]-sq, width: sq*2, height: sq*2, rx: 1.5,
-        fill: bases[1]?"#ffb52e":"#122016", stroke: bases[1]?"#ffb52e":"#2e4234", strokeWidth: 1.5,
+        fill: bases[1]?"#ff8c00":"#0d2010", stroke: bases[1]?"#ffb000":"#1a5c22", strokeWidth: 1.5,
         transform: `rotate(45,${b2[0]},${b2[1]})`,})
       
       , React.createElement('rect', { x: b3[0]-sq, y: b3[1]-sq, width: sq*2, height: sq*2, rx: 1.5,
-        fill: bases[2]?"#ffb52e":"#122016", stroke: bases[2]?"#ffb52e":"#2e4234", strokeWidth: 1.5,
+        fill: bases[2]?"#ff8c00":"#0d2010", stroke: bases[2]?"#ffb000":"#1a5c22", strokeWidth: 1.5,
         transform: `rotate(45,${b3[0]},${b3[1]})`,})
       
       , [[b1,0,8,-12],[b2,1,0,-14],[b3,2,-8,-12]].map(([[bx,by],idx,dx,dy])=>{
@@ -804,11 +804,11 @@ const LiveFieldComponent = (function(){
     c.arcTo(flx,fly,flx+100,fly-100,fcr);
     c.arc(fvx,fvy,fR,Math.PI*1.25+fcr/fR,Math.PI*1.75-fcr/fR);
     c.arcTo(frx,fry,fvx,fvy,fcr);
-    c.closePath();c.fillStyle="#3d7a3a";c.fill();c.restore();
+    c.closePath();c.fillStyle="#2d6e2a";c.fill();c.restore();
     c.beginPath();c.moveTo(cx,cy+7);
     c.arc(cx,cy+7,95,Math.PI*1.25-brownExp,Math.PI*1.75+brownExp);
-    c.closePath();c.fillStyle="#9c7248";c.fill();
-    c.beginPath();c.arc(cx,cy-2,42,0,Math.PI*2);c.fillStyle="#9c7248";c.fill();
+    c.closePath();c.fillStyle="#c4894a";c.fill();
+    c.beginPath();c.arc(cx,cy-2,42,0,Math.PI*2);c.fillStyle="#c4894a";c.fill();
     (function(){
       const rA=Math.PI*1.75+brownExp,lA=Math.PI*1.25-brownExp;
       const rc={x:cx+95*Math.cos(rA),y:cy+7+95*Math.sin(rA)};
@@ -830,15 +830,15 @@ const LiveFieldComponent = (function(){
     function fanArcHit(dx,dy){const ay=-44;const b=ay*dy,cc=ay*ay-230*230;const t=-b+Math.sqrt(b*b-cc);return{x:cx+dx*t,y:(cy+7)+dy*t};}
     const fRf=fanArcHit(Math.cos(Math.PI*1.75),Math.sin(Math.PI*1.75));
     const fLf=fanArcHit(Math.cos(Math.PI*1.25),Math.sin(Math.PI*1.25));
-    c.strokeStyle="#fff";c.lineWidth=3;
+    c.strokeStyle="#f0f0f0";c.lineWidth=2.5;
     c.beginPath();c.moveTo(fRf.x,fRf.y);c.lineTo((cx+(cy+7))-(cy-9),cy-9);c.stroke();
     c.beginPath();c.moveTo(fLf.x,fLf.y);c.lineTo((cy-9)-((cy+7)-cx),cy-9);c.stroke();
     const r=38;
     const fB={x:cx+r+2.5,y:cy-r-2.5},sB={x:cx,y:cy-r*2-5},tB={x:cx-r-2.5,y:cy-r-2.5};
-    function dB(x,y){c.save();c.translate(x,y);c.rotate(Math.PI/4);c.fillStyle="#fff";c.fillRect(-5,-5,10,10);c.restore();}
+    function dB(x,y){c.save();c.translate(x,y);c.rotate(Math.PI/4);c.fillStyle="#f5f5f0";c.fillRect(-5,-5,10,10);c.restore();}
     dB(fB.x,fB.y);dB(sB.x,sB.y);dB(tB.x,tB.y);
-    c.beginPath();c.moveTo(cx-7,cy-8);c.lineTo(cx+7,cy-8);c.lineTo(cx+7,cy);c.lineTo(cx,cy+7);c.lineTo(cx-7,cy);c.closePath();c.fillStyle="#fff";c.fill();
-    c.beginPath();c.arc(cx,cy-r-5,8,0,Math.PI*2);c.fillStyle="#7a5535";c.fill();
+    c.beginPath();c.moveTo(cx-7,cy-8);c.lineTo(cx+7,cy-8);c.lineTo(cx+7,cy);c.lineTo(cx,cy+7);c.lineTo(cx-7,cy);c.closePath();c.fillStyle="#f5f5f0";c.fill();
+    c.beginPath();c.arc(cx,cy-r-5,8,0,Math.PI*2);c.fillStyle="#b07840";c.fill();
     fieldCache=oc;
     return oc;
   }
@@ -4082,7 +4082,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.84")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.85")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4166,7 +4166,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.84")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.85")
         )
 
         // ===== 新規チーム作成 =====
@@ -4404,31 +4404,32 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.84",date:"2026/06/25",items:["スコアボード：9イニング・延長対応のデフォルト値を修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["スコアボード改善：最終回裏不要時に×表示・サヨナラに×付加・速報中は攻撃終了まで0を表示しない"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 ライト系：スタメン選手名・成績数字・スタンプを見やすく修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["🔒 ログアウト時に他チームのデータが残るバグを修正（完全クリア）","📸 ライトデザインのスコア・選手名が見えにくい問題を修正","📸 写真ドラッグ動作を改善"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["運営からのお知らせを最新5件に整理","速報フィールドをMLBスタジアム風カラーに変更","📸 投手カードのIP・K/9表示修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["スコアボード：9イニング・延長対応のデフォルト値を修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["スコアボード改善：最終回裏不要時に×表示・サヨナラに×付加・速報中は攻撃終了まで0を表示しない"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 ライト系：スタメン選手名・成績数字・スタンプを見やすく修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["🔒 ログアウト時に他チームのデータが残るバグを修正（完全クリア）","📸 ライトデザインのスコア・選手名が見えにくい問題を修正","📸 写真ドラッグ動作を改善"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -4439,7 +4440,7 @@ function App() {
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
                   {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記バグを修正"]},
                   {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設"]},
-                ].map((n,ni)=>
+                ].slice(0,5).map((n,ni)=>
                   React.createElement('div', {key:ni, style:{
                     borderTop:ni===0?"none":"1px solid #1a2d1e",
                     paddingTop:ni===0?0:10, marginTop:ni===0?0:10,
@@ -4529,15 +4530,15 @@ function App() {
               return React.createElement('svg',{width:sz,height:sz,viewBox:"0 0 "+sz+" "+sz,style:{flexShrink:0}}
                 ,React.createElement('polygon',{
                   points:`${cx+r},${cy} ${cx},${cy-r} ${cx-r},${cy} ${cx},${cy+r}`,
-                  fill:"none",stroke:"#24402b",strokeWidth:1.5
+                  fill:"none",stroke:"#1a5c22",strokeWidth:2
                 })
                 ,pts.map(({x,y,bi})=>{
                   const occ=!!_bases[bi];
                   return React.createElement('g',{key:bi}
                     ,React.createElement('rect',{
                       x:x-8,y:y-8,width:16,height:16,rx:3,
-                      fill:occ?"#f97316":"#122016",
-                      stroke:occ?"#fb923c":"#33573c",strokeWidth:occ?2:1.5,
+                      fill:occ?"#ff6b1a":"#0d2010",
+                      stroke:occ?"#ff8c40":"#1a5c22",strokeWidth:occ?2:1.5,
                       transform:`rotate(45,${x},${y})`
                     })
                     ,occ&&React.createElement('text',{x,y:y+4,textAnchor:"middle",fontSize:8,fill:"#fff",fontWeight:700},
@@ -4545,7 +4546,7 @@ function App() {
                   );
                 })
                 ,React.createElement('rect',{x:cx-6,y:cy+r-6,width:12,height:12,rx:2,
-                  fill:"#24402b",stroke:"#3b82f6",strokeWidth:1,
+                  fill:"#0d2010",stroke:"#4499ff",strokeWidth:1.5,
                   transform:`rotate(45,${cx},${cy+r})`})
               );
             };
@@ -5811,31 +5812,32 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.84",date:"2026/06/25",items:["スコアボード：9イニング・延長対応のデフォルト値を修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["スコアボード改善：最終回裏不要時に×表示・サヨナラに×付加・速報中は攻撃終了まで0を表示しない"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 ライト系：スタメン選手名・成績数字・スタンプを見やすく修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["🔒 ログアウト時に他チームのデータが残るバグを修正（完全クリア）","📸 ライトデザインのスコア・選手名が見えにくい問題を修正","📸 写真ドラッグ動作を改善"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
-                  {ver:"v472.84",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.84",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["運営からのお知らせを最新5件に整理","速報フィールドをMLBスタジアム風カラーに変更","📸 投手カードのIP・K/9表示修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["スコアボード：9イニング・延長対応のデフォルト値を修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["スコアボード改善：最終回裏不要時に×表示・サヨナラに×付加・速報中は攻撃終了まで0を表示しない"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 ライト系：スタメン選手名・成績数字・スタンプを見やすく修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["🔒 ログアウト時に他チームのデータが残るバグを修正（完全クリア）","📸 ライトデザインのスコア・選手名が見えにくい問題を修正","📸 写真ドラッグ動作を改善"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
+                  {ver:"v472.85",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.85",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -5846,7 +5848,7 @@ function App() {
                   {ver:"v472.42",date:"2026/06/22",items:["守備交代・スタメン設定でポジション自動スワップに対応"]},
                   {ver:"v472.40",date:"2026/06/22",items:["走塁系アニメが前打席の結果を表示するバグを修正","投手表記バグを修正"]},
                   {ver:"v472.34",date:"2026/06/20",items:["トップタブを新設"]},
-                ].map((n,ni)=>
+                ].slice(0,5).map((n,ni)=>
                   React.createElement('div', {key:ni, style:{
                     borderTop: ni===0?"none":"1px solid #1a2d1e",
                     paddingTop: ni===0?0:10,
@@ -9082,7 +9084,15 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   React.useEffect(function(){
     if(onPitMap && awayPit && awayPit.length>0){
       var m={};
-      awayPit.forEach(function(p){ m[p.name]=p; });
+      awayPit.forEach(function(p){
+        // ip（表示用文字列）とk9を追加
+        var ipW=Math.floor((p.outs||0)/3); var ipR=(p.outs||0)%3;
+        var ipStr=ipW+(ipR>0?"."+ipR:"");
+        var ipN=ipW+ipR/3;
+        var avgInn=p.avgInnings||9;
+        var k9Val=ipN>0?(((p.k||0)*avgInn)/ipN).toFixed(1):"0.0";
+        m[p.name]=Object.assign({},p,{ip:ipStr,k9:k9Val});
+      });
       onPitMap(m);
     }
   },[awayPit]);
