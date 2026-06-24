@@ -1919,6 +1919,7 @@ const lsSave = (d) => {
         log: (d.currentGame.log||[]).slice(-200), // 直近200件
       } : d.currentGame,
       history: (d.history||[]).slice(-50), // 履歴は直近50試合
+      undoStack: (d.undoStack||[]).slice(0,30), // 保存は30件（メモリ上は無制限）
     };
     const s = JSON.stringify(saveData);
     localStorage.setItem(SKEY, s);
@@ -2408,9 +2409,9 @@ function App() {
         const hist = [...(s.history||[])];
         const idx = hist.findIndex(h=>h.id===newGame.id);
         if(idx>=0) hist[idx]={...newGame, savedAt:hist[idx].savedAt||new Date().toLocaleString("ja-JP")};
-        return {...s, currentGame:newGame, undoStack:newUndoStack.slice(0,30), history:hist};
+        return {...s, currentGame:newGame, undoStack:newUndoStack, history:hist};
       }
-      return {...s, currentGame:newGame, undoStack:newUndoStack.slice(0,30)};
+      return {...s, currentGame:newGame, undoStack:newUndoStack};
     });
   },[setStorage]);
 
@@ -4078,7 +4079,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.77")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v472.80")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4162,7 +4163,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.77")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v472.80")
         )
 
         // ===== 新規チーム作成 =====
@@ -4400,24 +4401,27 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.77",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
-                  {ver:"v472.77",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
-                  {ver:"v472.77",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
-                  {ver:"v472.77",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
-                  {ver:"v472.77",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
-                  {ver:"v472.77",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -5485,12 +5489,7 @@ function App() {
                           , React.createElement('span', { style: {color:"#4b6052"},}, "/")
                           , React.createElement('span', { style: {color:"#ff7d72"},}, p.cs||0)
                         )
-                        , React.createElement('td', { style: {...S.td,padding:2,textAlign:"center"},}
-                          , !isReadOnly && React.createElement('button', { onClick: ()=>setModal({team,pidx:idx,step:"sub"}),
-                            style: {fontSize:9,padding:"2px 6px",borderRadius:5,cursor:"pointer",
-                              background:"transparent",border:"1px solid #33573c",color:"#74897b"},}, "交代"
-                          )
-                        )
+                        , React.createElement('td', { style: {...S.td,padding:2,textAlign:"center"},})
                         , gameInnings.map(inn=>{
                           const list=toList(p.atBats,inn);
                           const runs=eRuns(list);
@@ -5550,16 +5549,7 @@ function App() {
                 , React.createElement('div', {style:{display:"flex",alignItems:"center",marginBottom:12}}
                   , React.createElement('div', {style:{...S.ct,marginBottom:0,borderLeft:"none",paddingLeft:0}},
                       teamName, " の投手")
-                  , React.createElement('button', {
-                      onClick:()=>{
-                        mutGame(g=>{
-                          const ps=[...g[side+"Pitchers"]];
-                          ps.push({id:ps.length+1,name:`投手${ps.length+1}`,ip:0,h:0,er:0,bb:0,k:0,pitchCount:0,autoIp:0,autoH:0,autoEr:0,autoBb:0,autoK:0,manualOverride:false});
-                          return{...g,[side+"Pitchers"]:ps};
-                        });
-                      },
-                      style:{...sBt("#4b6052",true),fontSize:11,padding:"3px 10px",marginLeft:"auto"}
-                    }, "＋ 投手追加")
+
                 )
                 , React.createElement('div', {style:{overflowX:"auto"}}
                   , React.createElement('table', {style:{...S.table, minWidth:520}}
@@ -5755,24 +5745,27 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v472.77",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
-                  {ver:"v472.77",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
-                  {ver:"v472.77",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
-                  {ver:"v472.77",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
-                  {ver:"v472.77",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
-                  {ver:"v472.77",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
-                  {ver:"v472.77",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 写真をドラッグで移動可能に・固定ボタン追加","投手タブの「投手追加」ボタンを削除","オーダータブの「交代」ボタンを削除"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["「戻す」を試合開始まで無制限に戻せるよう改善（保存は引き続き30件）"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 カラーテーマを17種に拡張（各都市DARK/LIGHT + SD追加）","「簡単！みんなの野球記録」表示をどのテーマでも見やすく修正"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 カラーテーマ9種追加（DARK/NYY/BOS/LAD/SF/CHC/HOU/SEA/LIGHT）"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["通算成績のチーム合計「死球」が0になるバグを修正"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 写真の上下・左右スライダーが写真を正しく動かすように修正"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 投手成績カードのIPに「回」が表示されるバグを修正"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 打撃・投手成績をタブを開く順番に関係なく正確に表示","📸 写真の左右位置スライダーを追加（上下・左右・サイズ全対応）","📸 写真の上下位置が正しく動くように修正"]},
+                  {ver:"v472.80",date:"2026/06/25",items:["📸 打撃成績も成績タブと完全に連動（打率ズレを修正）","✅ 成績タブを開いてからシェアタブを開くと正確な数字が表示されます"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["大会データ消える問題を根本修正（Firebase保存・読み込みに大会データを追加）","📸 打者・投手成績の写真サイズ・位置スライダーを正しい位置に表示"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 レンダリングエラー修正・投手成績を成績タブと連動（成績タブを先に開くとより正確）"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 投手成績の数字を成績タブの計算結果と直接連動（防御率ズレを根本解決）"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 投手成績の試合データ参照ロジックを成績タブと完全に統一（自責点ズレを修正）"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 投手成績カードの防御率を成績タブと完全に同じ計算方式に統一"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 投手成績カードの数字を成績タブと同じ正確な値に修正"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 シェアカードに投手成績カードを追加（ERA・IP・勝敗・K・WHIP・K/9など）"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 試合結果のスライダー2重表示を修正・個人成績のスライダーを正しい場所に表示"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 シェアカードを独立タブに変更（下ページとの干渉解消・全体が見やすく）"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 シェアカード：テキスト追加・文字サイズ調整機能を追加"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 シェアカード：写真のサイズ・上下位置をスライダーで調整可能に"]},
+                  {ver:"v472.80",date:"2026/06/24",items:["📸 保存をiOS写真アプリ対応に改善（Share API）","写真あり/なしボタン表記を統一"]},
                   {ver:"v472.57",date:"2026/06/24",items:["📸 シェアカード改善：出場試合数・大会名・写真差込・写真なし個人成績・JPEG保存対応"]},
                   {ver:"v472.56",date:"2026/06/24",items:["📸 シェアカード機能を追加（試合結果・打者成績カードを画像保存）","大会データがアップデートで消えるバグを修正"]},
                   {ver:"v472.53",date:"2026/06/23",items:["通算成績が最新試合に反映されないバグを修正"]},
@@ -7911,6 +7904,10 @@ function ShareCardModal(props) {
   var photoOffsetY = photoOffsetYState[0]; var setPhotoOffsetY = photoOffsetYState[1];
   var photoOffsetXState = useState(50);
   var photoOffsetX = photoOffsetXState[0]; var setPhotoOffsetX = photoOffsetXState[1];
+  var photoLockedState = useState(false);
+  var photoLocked = photoLockedState[0]; var setPhotoLocked = photoLockedState[1];
+  var dragStartState = useState(null);
+  var dragStart = dragStartState[0]; var setDragStart = dragStartState[1];
   var captionState = useState("");
   var captionText = captionState[0]; var setCaptionText = captionState[1];
   var captionSizeState = useState(18);
@@ -8098,15 +8095,23 @@ function ShareCardModal(props) {
 
   // スタイル
   var THEMES = {
-    dark:    {accent:"#ffd700",bg:"#000",   cardBg:"radial-gradient(ellipse at 50% 60%,#050a18 0%,#000208 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#b8900a,#ffd700,#e8b800,#ffd700,#b8900a)",bannerTxt:"#000",sbA:"#080600",sbH:"#060606",aCol:"#ffd700",hCol:"#fff",txt:"#fff",stBg:"#0a0800",stTit:"#ffd700",label:"DARK"},
-    yankees: {accent:"#c4ced4",bg:"#1a1a24",cardBg:"radial-gradient(ellipse at 50% 60%,#0a0a18 0%,#050510 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#0d3a8c,#1a4fa8,#0d3a8c)",bannerTxt:"#c4ced4",sbA:"#0d0d20",sbH:"#080810",aCol:"#c4ced4",hCol:"#aaa",txt:"#fff",stBg:"#080818",stTit:"#c4ced4",label:"NYY"},
-    redsox:  {accent:"#bd3039",bg:"#0a0005",cardBg:"radial-gradient(ellipse at 50% 60%,#1a0008 0%,#0a0005 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#0d2b56,#bd3039,#0d2b56)",bannerTxt:"#fff",  sbA:"#180005",sbH:"#060010",aCol:"#bd3039",hCol:"#c4ced4",txt:"#fff",stBg:"#150005",stTit:"#bd3039",label:"BOS"},
-    dodgers: {accent:"#5ab4ff",bg:"#000510",cardBg:"radial-gradient(ellipse at 50% 60%,#001428 0%,#000510 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#003087,#005a9c,#003087)",bannerTxt:"#fff",  sbA:"#000d20",sbH:"#000510",aCol:"#5ab4ff",hCol:"#ef3e42",txt:"#fff",stBg:"#00081a",stTit:"#5ab4ff",label:"LAD"},
-    giants:  {accent:"#fd5a1e",bg:"#0a0500",cardBg:"radial-gradient(ellipse at 50% 60%,#1a0800 0%,#0a0500 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#27251f,#fd5a1e,#27251f)",bannerTxt:"#fff",  sbA:"#180800",sbH:"#0a0500",aCol:"#fd5a1e",hCol:"#fff",  txt:"#fff",stBg:"#150600",stTit:"#fd5a1e",label:"SF"},
-    cubs:    {accent:"#6699ff",bg:"#000410",cardBg:"radial-gradient(ellipse at 50% 60%,#000d28 0%,#000410 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#cc3433,#0e3386,#cc3433)",bannerTxt:"#fff",  sbA:"#000820",sbH:"#050010",aCol:"#6699ff",hCol:"#cc3433",txt:"#fff",stBg:"#00061a",stTit:"#6699ff",label:"CHC"},
-    astros:  {accent:"#eb6e1f",bg:"#050800",cardBg:"radial-gradient(ellipse at 50% 60%,#0a1000 0%,#050800 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#002d62,#eb6e1f,#002d62)",bannerTxt:"#fff",  sbA:"#080d00",sbH:"#040600",aCol:"#eb6e1f",hCol:"#6699cc",txt:"#fff",stBg:"#060a00",stTit:"#eb6e1f",label:"HOU"},
-    mariners:{accent:"#4dbbbb",bg:"#000a08",cardBg:"radial-gradient(ellipse at 50% 60%,#001a18 0%,#000a08 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#005c5c,#0d6b3a,#005c5c)",bannerTxt:"#fff",  sbA:"#001510",sbH:"#000a08",aCol:"#4dbbbb",hCol:"#c4ced4",txt:"#fff",stBg:"#001210",stTit:"#4dbbbb",label:"SEA"},
-    light:   {accent:"#1a3a6c",bg:"#e8edf2",cardBg:"linear-gradient(160deg,#dce4ef 0%,#eef2f7 100%)",              bannerBg:"linear-gradient(90deg,#1a3a6c,#2a5aaa,#1a3a6c)",bannerTxt:"#fff",  sbA:"#d5dce8",sbH:"#dce4ee",aCol:"#1a3a6c",hCol:"#444",  txt:"#111",stBg:"#d8e0ea",stTit:"#1a3a6c",label:"LIGHT"},
+    dark:   {accent:"#ffd700",bg:"#000",   cardBg:"radial-gradient(ellipse at 50% 60%,#050a18 0%,#000208 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#b8900a,#ffd700,#e8b800,#ffd700,#b8900a)",bannerTxt:"#000",sbA:"#080600",sbH:"#060606",aCol:"#ffd700",hCol:"#fff",txt:"#fff",stBg:"#0a0800",stTit:"#ffd700",label:"DARK"},
+    nyD:    {accent:"#c4ced4",bg:"#0a0d18",cardBg:"radial-gradient(ellipse at 50% 60%,#0a0d1e 0%,#060810 60%,#03050f 100%)",bannerBg:"linear-gradient(90deg,#0a2a6e,#1a4fa8,#0a2a6e)",bannerTxt:"#ffffff",sbA:"#0a0d20",sbH:"#07090e",aCol:"#c4ced4",hCol:"#7090cc",txt:"#fff",stBg:"#080a18",stTit:"#c4ced4",label:"NY D"},
+    nyL:    {accent:"#0d3a8c",bg:"#dce6f5",cardBg:"linear-gradient(160deg,#c8d8ee 0%,#dce6f5 100%)",              bannerBg:"linear-gradient(90deg,#0a2a6e,#1a4fa8,#0a2a6e)",bannerTxt:"#ffffff",sbA:"#c5d3e8",sbH:"#cfdaeb",aCol:"#0d3a8c",hCol:"#444",  txt:"#111",stBg:"#c2d0e5",stTit:"#0d3a8c",label:"NY L"},
+    bosD:   {accent:"#bd3039",bg:"#0a0005",cardBg:"radial-gradient(ellipse at 50% 60%,#1a0008 0%,#0a0005 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#0d2b56,#bd3039,#0d2b56)",bannerTxt:"#ffffff",sbA:"#180005",sbH:"#060010",aCol:"#bd3039",hCol:"#c4ced4",txt:"#fff",stBg:"#150005",stTit:"#bd3039",label:"BOS D"},
+    bosL:   {accent:"#bd3039",bg:"#f0e8e8",cardBg:"linear-gradient(160deg,#e8d0d0 0%,#f0e8e8 100%)",              bannerBg:"linear-gradient(90deg,#0d2b56,#bd3039,#0d2b56)",bannerTxt:"#ffffff",sbA:"#e2d0d0",sbH:"#ead8d8",aCol:"#bd3039",hCol:"#0d2b56",txt:"#111",stBg:"#dfc8c8",stTit:"#bd3039",label:"BOS L"},
+    laD:    {accent:"#5ab4ff",bg:"#000510",cardBg:"radial-gradient(ellipse at 50% 60%,#001428 0%,#000510 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#003087,#005a9c,#003087)",bannerTxt:"#ffffff",sbA:"#000d20",sbH:"#000510",aCol:"#5ab4ff",hCol:"#ef3e42",txt:"#fff",stBg:"#00081a",stTit:"#5ab4ff",label:"LA D"},
+    laL:    {accent:"#003087",bg:"#e8eef8",cardBg:"linear-gradient(160deg,#d0dcf0 0%,#e8eef8 100%)",              bannerBg:"linear-gradient(90deg,#003087,#005a9c,#003087)",bannerTxt:"#ffffff",sbA:"#c8d8f0",sbH:"#d0ddf2",aCol:"#003087",hCol:"#c8102e",txt:"#111",stBg:"#c5d5ee",stTit:"#003087",label:"LA L"},
+    sfD:    {accent:"#fd5a1e",bg:"#0a0500",cardBg:"radial-gradient(ellipse at 50% 60%,#1a0800 0%,#0a0500 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#27251f,#fd5a1e,#27251f)",bannerTxt:"#ffffff",sbA:"#180800",sbH:"#0a0500",aCol:"#fd5a1e",hCol:"#ffe09a",txt:"#fff",stBg:"#150600",stTit:"#fd5a1e",label:"SF D"},
+    sfL:    {accent:"#fd5a1e",bg:"#f5ede8",cardBg:"linear-gradient(160deg,#eed8cc 0%,#f5ede8 100%)",              bannerBg:"linear-gradient(90deg,#27251f,#fd5a1e,#27251f)",bannerTxt:"#ffffff",sbA:"#e8d0c0",sbH:"#eed8c8",aCol:"#fd5a1e",hCol:"#27251f",txt:"#111",stBg:"#e5ccbc",stTit:"#fd5a1e",label:"SF L"},
+    chiD:   {accent:"#6699ff",bg:"#000410",cardBg:"radial-gradient(ellipse at 50% 60%,#000d28 0%,#000410 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#cc3433,#0e3386,#cc3433)",bannerTxt:"#ffffff",sbA:"#000820",sbH:"#050010",aCol:"#6699ff",hCol:"#cc3433",txt:"#fff",stBg:"#00061a",stTit:"#6699ff",label:"CHI D"},
+    chiL:   {accent:"#0e3386",bg:"#e8ecf8",cardBg:"linear-gradient(160deg,#d0d8f0 0%,#e8ecf8 100%)",              bannerBg:"linear-gradient(90deg,#cc3433,#0e3386,#cc3433)",bannerTxt:"#ffffff",sbA:"#c8d0ee",sbH:"#d0d8f0",aCol:"#0e3386",hCol:"#cc3433",txt:"#111",stBg:"#c5cde8",stTit:"#0e3386",label:"CHI L"},
+    houD:   {accent:"#eb6e1f",bg:"#050800",cardBg:"radial-gradient(ellipse at 50% 60%,#0a1000 0%,#050800 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#002d62,#eb6e1f,#002d62)",bannerTxt:"#ffffff",sbA:"#080d00",sbH:"#040600",aCol:"#eb6e1f",hCol:"#6699cc",txt:"#fff",stBg:"#060a00",stTit:"#eb6e1f",label:"HOU D"},
+    houL:   {accent:"#002d62",bg:"#e8eff8",cardBg:"linear-gradient(160deg,#d0dff0 0%,#e8eff8 100%)",              bannerBg:"linear-gradient(90deg,#002d62,#eb6e1f,#002d62)",bannerTxt:"#ffffff",sbA:"#c8d8ee",sbH:"#d0dff2",aCol:"#002d62",hCol:"#eb6e1f",txt:"#111",stBg:"#c5d5eb",stTit:"#002d62",label:"HOU L"},
+    seaD:   {accent:"#4dbbbb",bg:"#000a08",cardBg:"radial-gradient(ellipse at 50% 60%,#001a18 0%,#000a08 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#005c5c,#0d6b3a,#005c5c)",bannerTxt:"#ffffff",sbA:"#001510",sbH:"#000a08",aCol:"#4dbbbb",hCol:"#c4ced4",txt:"#fff",stBg:"#001210",stTit:"#4dbbbb",label:"SEA D"},
+    seaL:   {accent:"#005c5c",bg:"#e8f5f5",cardBg:"linear-gradient(160deg,#ccebeb 0%,#e8f5f5 100%)",              bannerBg:"linear-gradient(90deg,#005c5c,#0d6b3a,#005c5c)",bannerTxt:"#ffffff",sbA:"#c5e5e5",sbH:"#cceaea",aCol:"#005c5c",hCol:"#0d6b3a",txt:"#111",stBg:"#c0e0e0",stTit:"#005c5c",label:"SEA L"},
+    sdD:    {accent:"#a2813a",bg:"#080603",cardBg:"radial-gradient(ellipse at 50% 60%,#1a1208 0%,#080603 60%,#000 100%)",bannerBg:"linear-gradient(90deg,#2f241d,#a2813a,#2f241d)",bannerTxt:"#ffffff",sbA:"#150f05",sbH:"#080603",aCol:"#a2813a",hCol:"#fff",  txt:"#fff",stBg:"#120d04",stTit:"#a2813a",label:"SD D"},
+    sdL:    {accent:"#2f241d",bg:"#f5f0e8",cardBg:"linear-gradient(160deg,#ede0cc 0%,#f5f0e8 100%)",              bannerBg:"linear-gradient(90deg,#2f241d,#a2813a,#2f241d)",bannerTxt:"#ffffff",sbA:"#e5d8c5",sbH:"#ece0cb",aCol:"#2f241d",hCol:"#a2813a",txt:"#111",stBg:"#e2d5c0",stTit:"#2f241d",label:"SD L"},
   };
   var T = THEMES[colorTheme] || THEMES.dark;
   var GOLD = T.accent;
@@ -8159,14 +8164,22 @@ function ShareCardModal(props) {
         background:"#050510",display:"flex",alignItems:"center",justifyContent:"center",
         borderBottom:"2px solid "+GOLD}}
         ,photoUrl
-          ?React.createElement("img",{src:photoUrl,style:{
-            width:photoScale+"%",height:photoScale+"%",
+          ?React.createElement("img",{src:photoUrl,
+              draggable:false,
+              onMouseDown:!photoLocked?function(e){e.preventDefault();setDragStart({x:e.clientX,y:e.clientY,ox:photoOffsetX,oy:photoOffsetY});}:null,
+              onMouseMove:(!photoLocked&&dragStart)?function(e){var dx=(e.clientX-dragStart.x)/1.5;var dy=(e.clientY-dragStart.y)/1.5;setPhotoOffsetX(Math.max(0,Math.min(100,dragStart.ox+dx)));setPhotoOffsetY(Math.max(0,Math.min(100,dragStart.oy+dy)));}:null,
+              onMouseUp:function(){setDragStart(null);},
+              onTouchStart:!photoLocked?function(e){var t=e.touches[0];setDragStart({x:t.clientX,y:t.clientY,ox:photoOffsetX,oy:photoOffsetY});}:null,
+              onTouchMove:(!photoLocked&&dragStart)?function(e){e.preventDefault();var t=e.touches[0];var dx=(t.clientX-dragStart.x)/1.5;var dy=(t.clientY-dragStart.y)/1.5;setPhotoOffsetX(Math.max(0,Math.min(100,dragStart.ox+dx)));setPhotoOffsetY(Math.max(0,Math.min(100,dragStart.oy+dy)));}:null,
+              onTouchEnd:function(){setDragStart(null);},
+              style:{width:photoScale+"%",height:photoScale+"%",
             objectFit:"cover",
             position:"absolute",
             top:photoOffsetY+"%",
             left:photoOffsetX+"%",
             transform:"translate(-"+photoOffsetX+"%, -"+photoOffsetY+"%)",
-            minWidth:"100%",minHeight:"100%"}})
+            minWidth:"100%",minHeight:"100%",
+            cursor:photoLocked?"default":"grab",userSelect:"none"}})
           :React.createElement("div",{style:{color:"#222",fontFamily:"'Bebas Neue',sans-serif",fontSize:10,letterSpacing:3}},"PHOTO")
         ,React.createElement("div",{style:{position:"absolute",top:5,left:5,width:13,height:13,borderTop:"2px solid "+GOLD,borderLeft:"2px solid "+GOLD}})
         ,React.createElement("div",{style:{position:"absolute",top:5,right:5,width:13,height:13,borderTop:"2px solid "+GOLD,borderRight:"2px solid "+GOLD}})
@@ -8261,7 +8274,7 @@ function ShareCardModal(props) {
       background:T.cardBg})}
       ,React.createElement("div",{style:{background:T.bannerBg,padding:"3px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}
         ,React.createElement("div",{style:{fontFamily:"'Oswald',sans-serif",fontSize:8,fontWeight:700,color:T.bannerTxt,letterSpacing:2}},"⚾ SEASON STATS")
-        ,React.createElement("div",{style:{fontFamily:"'Noto Sans JP',sans-serif",fontSize:7,fontWeight:900,color:T.bannerTxt}},"簡単！みんなの野球記録")
+        ,React.createElement("div",{style:{fontFamily:"'Noto Sans JP',sans-serif",fontSize:7,fontWeight:900,color:"#fff",background:"rgba(0,0,0,0.35)",padding:"1px 4px",borderRadius:2}},"簡単！みんなの野球記録")
       )
       ,React.createElement("div",{style:{display:"flex",height:noPhoto?100:138,position:"relative",zIndex:2}}
         ,!noPhoto&&React.createElement("div",{style:{width:110,flexShrink:0,
@@ -8269,7 +8282,27 @@ function ShareCardModal(props) {
           display:"flex",alignItems:"center",justifyContent:"center",
           borderRight:"2px solid "+ac,position:"relative",overflow:"hidden"}}
           ,photoUrl
-            ?React.createElement("img",{src:photoUrl,style:{
+            ?React.createElement("img",{src:photoUrl,
+              draggable:false,
+              onMouseDown:!photoLocked?function(e){e.preventDefault();setDragStart({x:e.clientX,y:e.clientY,ox:photoOffsetX,oy:photoOffsetY});}:null,
+              onMouseMove:(!photoLocked&&dragStart)?function(e){
+                var dx=(e.clientX-dragStart.x)/1.5;
+                var dy=(e.clientY-dragStart.y)/1.5;
+                setPhotoOffsetX(Math.max(0,Math.min(100,dragStart.ox+dx)));
+                setPhotoOffsetY(Math.max(0,Math.min(100,dragStart.oy+dy)));
+              }:null,
+              onMouseUp:function(){setDragStart(null);},
+              onTouchStart:!photoLocked?function(e){var t=e.touches[0];setDragStart({x:t.clientX,y:t.clientY,ox:photoOffsetX,oy:photoOffsetY});}:null,
+              onTouchMove:(!photoLocked&&dragStart)?function(e){
+                e.preventDefault();
+                var t=e.touches[0];
+                var dx=(t.clientX-dragStart.x)/1.5;
+                var dy=(t.clientY-dragStart.y)/1.5;
+                setPhotoOffsetX(Math.max(0,Math.min(100,dragStart.ox+dx)));
+                setPhotoOffsetY(Math.max(0,Math.min(100,dragStart.oy+dy)));
+              }:null,
+              onTouchEnd:function(){setDragStart(null);},
+              style:{
               width:(photoScale)+"%",
               height:(photoScale)+"%",
               objectFit:"cover",
@@ -8277,7 +8310,9 @@ function ShareCardModal(props) {
               top:photoOffsetY+"%",
               left:photoOffsetX+"%",
               transform:"translate(-"+photoOffsetX+"%, -"+photoOffsetY+"%)",
-              minWidth:"100%",minHeight:"100%"}})
+              minWidth:"100%",minHeight:"100%",
+              cursor:photoLocked?"default":"grab",
+              userSelect:"none"}})
             :React.createElement("div",{style:{fontFamily:"'Bebas Neue',sans-serif",fontSize:9,color:"#1e1e1e",letterSpacing:2}},"PHOTO")
           ,React.createElement("div",{style:{position:"absolute",top:5,left:5,width:13,height:13,borderTop:"2px solid "+ac,borderLeft:"2px solid "+ac}})
           ,React.createElement("div",{style:{position:"absolute",top:5,right:5,width:13,height:13,borderTop:"2px solid "+ac,borderRight:"2px solid "+ac}})
@@ -8421,6 +8456,15 @@ function ShareCardModal(props) {
         ,React.createElement("input",{ref:fileInputRef,type:"file",accept:"image/*",
           style:{display:"none"},onChange:handleFileChange})
         ,photoUrl&&React.createElement("div",null
+          ,React.createElement("div",{style:{display:"flex",gap:6,marginBottom:8}}
+            ,React.createElement("button",{
+              onClick:function(){setPhotoLocked(function(v){return !v;});},
+              style:{width:"100%",padding:"8px",borderRadius:8,border:"none",cursor:"pointer",
+                fontSize:11,fontWeight:700,
+                background:photoLocked?"#c8a400":"#0c160e",
+                color:photoLocked?"#000":"#74897b"}}
+              ,photoLocked?"🔒 固定中（タップで解除）":"🔓 ドラッグで移動")
+          )
           ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}}
             ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"サイズ")
             ,React.createElement("input",{type:"range",min:100,max:300,value:photoScale,
@@ -8492,6 +8536,15 @@ function ShareCardModal(props) {
           style:{display:"none"},onChange:handleFileChange})
       )
       ,photoUrl&&!noPhoto&&React.createElement("div",{style:{width:"100%",maxWidth:380,marginBottom:8}}
+        ,React.createElement("div",{style:{display:"flex",gap:6,marginBottom:8}}
+          ,React.createElement("button",{
+            onClick:function(){setPhotoLocked(function(v){return !v;});},
+            style:{flex:1,padding:"8px",borderRadius:8,border:"none",cursor:"pointer",
+              fontSize:11,fontWeight:700,
+              background:photoLocked?"#c8a400":"#0c160e",
+              color:photoLocked?"#000":"#74897b"}}
+            ,photoLocked?"🔒 固定中（タップで解除）":"🔓 ドラッグで移動")
+        )
         ,React.createElement("div",{style:{display:"flex",alignItems:"center",gap:8,marginBottom:6}}
           ,React.createElement("div",{style:{fontSize:10,color:"#74897b",minWidth:52}},"サイズ")
           ,React.createElement("input",{type:"range",min:100,max:300,value:photoScale,
