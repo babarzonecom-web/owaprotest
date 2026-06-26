@@ -3975,7 +3975,7 @@ function App() {
       `)
 
       
-      , !isReadOnly && React.createElement('header', { style: S.header,}
+      , !isReadOnly && tab!=="login" && tab!=="login_new" && React.createElement('header', { style: S.header,}
         , React.createElement('div', { style: S.hRow,}
           , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0},}
             , React.createElement('span', { style: {fontSize:24,flexShrink:0},}, "⚾")
@@ -4128,7 +4128,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v473.04")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 6px",whiteSpace:"nowrap",opacity:0.7}}, "v473.05")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
@@ -4147,10 +4147,9 @@ function App() {
             minHeight:"80vh",display:"flex",flexDirection:"column",
             alignItems:"center",justifyContent:"center",padding:"24px 20px"}}
 
-          // タイトル
-          , React.createElement('div', {style:{textAlign:"center",marginBottom:36}}
-            , React.createElement('div', {style:{fontSize:52,marginBottom:10}}, "⚾")
-
+          , React.createElement('div', {style:{textAlign:"center",marginBottom:28}}
+            , React.createElement('div', {style:{fontSize:14,fontWeight:700,color:"#e9f0ea",letterSpacing:2,marginBottom:2}}, "簡単！みんなの野球記録")
+            , React.createElement('div', {style:{fontSize:11,color:"#4b6052"}}, "草野球・少年野球スコアブック")
           )
 
           // 3つのモードボタン
@@ -4211,7 +4210,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.04")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.05")
         )
 
         // ===== 新規チーム作成 =====
@@ -4449,6 +4448,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.05",date:"2026/06/25",items:["ログイン前はスコアヘッダーを非表示に","ログイン画面の野球ボールを削除・「簡単！みんなの野球記録」表示に変更"]},
                   {ver:"v473.04",date:"2026/06/25",items:["ログイン画面・閲覧画面など全箇所の「おわプロスコア」表示を削除"]},
                   {ver:"v473.03",date:"2026/06/25",items:["ホーム画面をグリッドボタンに刷新・「おわプロスコア」表示を削除"]},
                   {ver:"v473.02",date:"2026/06/25",items:["📸 打者成績カードのRBIが空になるバグを修正"]},
@@ -5863,6 +5863,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.05",date:"2026/06/25",items:["ログイン前はスコアヘッダーを非表示に","ログイン画面の野球ボールを削除・「簡単！みんなの野球記録」表示に変更"]},
                   {ver:"v473.04",date:"2026/06/25",items:["ログイン画面・閲覧画面など全箇所の「おわプロスコア」表示を削除"]},
                   {ver:"v473.03",date:"2026/06/25",items:["ホーム画面をグリッドボタンに刷新・「おわプロスコア」表示を削除"]},
                   {ver:"v473.02",date:"2026/06/25",items:["📸 打者成績カードのRBIが空になるバグを修正"]},
