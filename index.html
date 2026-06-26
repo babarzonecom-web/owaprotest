@@ -3969,7 +3969,7 @@ function App() {
   }
 
   return (
-    React.createElement('div', { style: S.root,}
+    React.createElement('div', { style: Object.assign({},S.root,appTheme==="light"?{background:"#e8eef8",color:"#111"}:{background:"#000510",color:"#e8f0f8"}),}
       , React.createElement('style', null, `
         @import url('https:
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -3982,7 +3982,7 @@ function App() {
       `)
 
       
-      , !isReadOnly && tab!=="login" && tab!=="login_new" && game && game.started && React.createElement('header', { style: S.header,}
+      , !isReadOnly && tab!=="login" && tab!=="login_new" && game && game.started && React.createElement('header', { style: Object.assign({},S.header,appTheme==="light"?{background:"linear-gradient(135deg,#001a4d,#003087)",borderBottom:"1px solid #002070"}:{}),}
         , React.createElement('div', { style: S.hRow,}
           , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0},}
             , React.createElement('span', { style: {fontSize:24,flexShrink:0},}, "⚾")
@@ -4111,7 +4111,7 @@ function App() {
       )
 
       
-      , React.createElement('nav', { style: S.nav,}
+      , React.createElement('nav', { style: Object.assign({},S.nav,appTheme==="light"?{background:"#003087",borderBottom:"2px solid #002070"}:{})},}
         , React.createElement('div',{style:{display:"flex",overflowX:"auto",flex:1,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}
         , tab!=="login" && (isReadOnly
           ? [["top","🏠 トップ"],["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["share","📸 シェア"],["logout","⚙️ 設定"]].map(([id,l])=>(
@@ -4134,7 +4134,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap",opacity:0.8}}, "v473.10")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap",opacity:0.8}}, "v473.11")
         , React.createElement('button',{
             onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
             style:{background:"transparent",border:"none",cursor:"pointer",padding:"6px 6px 8px",
@@ -4222,7 +4222,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div',{style:{fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px"}}, "v473.10")
+          , React.createElement('div',{style:{fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px"}}, "v473.11")
           , React.createElement('button',{
               onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
               style:{background:"transparent",border:"none",cursor:"pointer",padding:"6px 4px 8px",
@@ -4465,6 +4465,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.11",date:"2026/06/25",items:["DARK/LIGHTテーマ切り替えを修正・タブの隙間を解消"]},
                   {ver:"v473.10",date:"2026/06/25",items:["タブ右端にDARK/LIGHTテーマ切り替えボタン追加"]},
                   {ver:"v473.08",date:"2026/06/25",items:["ヘッダーの保存・新試合ボタンを削除（自動保存・ホームから新試合）"]},
                   {ver:"v473.07",date:"2026/06/25",items:["試合未開始時はスコアヘッダー・操作ボタンを非表示に"]},
@@ -5884,6 +5885,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.11",date:"2026/06/25",items:["DARK/LIGHTテーマ切り替えを修正・タブの隙間を解消"]},
                   {ver:"v473.10",date:"2026/06/25",items:["タブ右端にDARK/LIGHTテーマ切り替えボタン追加"]},
                   {ver:"v473.08",date:"2026/06/25",items:["ヘッダーの保存・新試合ボタンを削除（自動保存・ホームから新試合）"]},
                   {ver:"v473.07",date:"2026/06/25",items:["試合未開始時はスコアヘッダー・操作ボタンを非表示に"]},
@@ -11454,7 +11456,7 @@ const S = {
   },
   nav:{
     background:"#07100a", borderBottom:"1px solid #24402b",
-    display:"flex", maxWidth:860, margin:"0 auto",
+    display:"flex", width:"100%",
     overflowX:"auto",
     padding:"calc(env(safe-area-inset-top,0px) + 4px) 4px 0",
     position:"sticky", top:0, zIndex:100, order:1,
