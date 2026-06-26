@@ -3964,7 +3964,7 @@ function App() {
   }
 
   return (
-    React.createElement('div', { style: Object.assign({},S.root,appTheme==="light"?{background:"#e8eef8",color:"#111"}:{}),}
+    React.createElement('div', { style: Object.assign({},S.root,appTheme==="light"?{background:"#e8eef8",color:"#1a1a2e"}:{background:"#000510",color:"#e8f0f8"}),}
       , React.createElement('style', null, `
         @import url('https:
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -4129,7 +4129,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.25")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.26")
         , React.createElement('button',{
             onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
             style:{background:"transparent",border:"none",cursor:"pointer",padding:"6px 6px",
@@ -4216,7 +4216,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.25")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.26")
         )
 
         // ===== 新規チーム作成 =====
@@ -4454,6 +4454,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.26",date:"2026/06/25",items:["タブ位置修正・ライトモードの文字色改善（ログ・前打者・選手ボタン）"]},
                   {ver:"v473.25",date:"2026/06/25",items:["全タブで画面外はみ出し問題を根本修正（flexレイアウトを元に戻す）"]},
                   {ver:"v473.24",date:"2026/06/25",items:["成績テーブルの横スクロールを復活・ライトモードのテーブル文字色を修正"]},
                   {ver:"v473.23",date:"2026/06/25",items:["全タブで画面外へのはみ出しを修正（body/htmlレベルで制御）"]},
@@ -5444,7 +5445,7 @@ function App() {
                   , React.createElement('span', { style: {
                       fontSize:13,
                       fontWeight:(e.runs>0||e.logType==="score"||e.logType==="sub")?700:400,
-                      color:(e.runs>0||e.logType==="score")?"#fde047":e.logType==="sub"?"#86efac":e.logType==="tb"?"#fbbf24":"#e9f0ea"
+                      color:(e.runs>0||e.logType==="score")?(appTheme==="light"?"#b45309":"#fde047"):e.logType==="sub"?(appTheme==="light"?"#15803d":"#86efac"):e.logType==="tb"?(appTheme==="light"?"#92400e":"#fbbf24"):(appTheme==="light"?"#1e3a5a":"#e9f0ea")
                     },}, e.msg)
                   , (e.runs&&e.runs>0)&&React.createElement('span', {style:{
                       fontSize:12, color:"#fff", fontWeight:900, marginLeft:"auto", flexShrink:0,
@@ -5880,6 +5881,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.26",date:"2026/06/25",items:["タブ位置修正・ライトモードの文字色改善（ログ・前打者・選手ボタン）"]},
                   {ver:"v473.25",date:"2026/06/25",items:["全タブで画面外はみ出し問題を根本修正（flexレイアウトを元に戻す）"]},
                   {ver:"v473.24",date:"2026/06/25",items:["成績テーブルの横スクロールを復活・ライトモードのテーブル文字色を修正"]},
                   {ver:"v473.23",date:"2026/06/25",items:["全タブで画面外へのはみ出しを修正（body/htmlレベルで制御）"]},
@@ -8756,7 +8758,7 @@ function ShareCardModal(props) {
             return React.createElement("button",{key:i,onClick:function(){setSelPlayer(p);},
               style:{padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
                 background:(selPlayer&&selPlayer.name===p.name)?"#c8a400":"#0c160e",
-                color:(selPlayer&&selPlayer.name===p.name)?"#000":"#9fb3a5"}},p.name);
+                color:(selPlayer&&selPlayer.name===p.name)?"#000":(appTheme==="light"?"#334":"#9fb3a5")}},p.name);
           })
         )
       )
@@ -11444,7 +11446,7 @@ const S = {
     background:"linear-gradient(180deg,#0f2040,#0c160e)",
     borderBottom:"1px solid #24402b",
     padding:"12px 16px 10px",
-    position:"sticky", top:"calc(env(safe-area-inset-top,0px) + 44px)", zIndex:90,
+    position:"sticky", top:"calc(env(safe-area-inset-top,0px) + 43px)", zIndex:90,
   },
   hRow:{
     maxWidth:860, margin:"0 auto",
