@@ -4129,7 +4129,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.26")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.27")
         , React.createElement('button',{
             onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
             style:{background:"transparent",border:"none",cursor:"pointer",padding:"6px 6px",
@@ -4216,7 +4216,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.26")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.27")
         )
 
         // ===== 新規チーム作成 =====
@@ -4454,6 +4454,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.27",date:"2026/06/25",items:["スクロール時にヘッダーが動く問題を修正"]},
                   {ver:"v473.26",date:"2026/06/25",items:["タブ位置修正・ライトモードの文字色改善（ログ・前打者・選手ボタン）"]},
                   {ver:"v473.25",date:"2026/06/25",items:["全タブで画面外はみ出し問題を根本修正（flexレイアウトを元に戻す）"]},
                   {ver:"v473.24",date:"2026/06/25",items:["成績テーブルの横スクロールを復活・ライトモードのテーブル文字色を修正"]},
@@ -5881,6 +5882,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.27",date:"2026/06/25",items:["スクロール時にヘッダーが動く問題を修正"]},
                   {ver:"v473.26",date:"2026/06/25",items:["タブ位置修正・ライトモードの文字色改善（ログ・前打者・選手ボタン）"]},
                   {ver:"v473.25",date:"2026/06/25",items:["全タブで画面外はみ出し問題を根本修正（flexレイアウトを元に戻す）"]},
                   {ver:"v473.24",date:"2026/06/25",items:["成績テーブルの横スクロールを復活・ライトモードのテーブル文字色を修正"]},
@@ -11446,7 +11448,6 @@ const S = {
     background:"linear-gradient(180deg,#0f2040,#0c160e)",
     borderBottom:"1px solid #24402b",
     padding:"12px 16px 10px",
-    position:"sticky", top:"calc(env(safe-area-inset-top,0px) + 43px)", zIndex:90,
   },
   hRow:{
     maxWidth:860, margin:"0 auto",
