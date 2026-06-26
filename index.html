@@ -19,7 +19,7 @@
 :root{color-scheme:dark;}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{-webkit-text-size-adjust:100%;}
-html{background:#0c160e;}body{background:#0c160e;color:white;margin:0;padding:0;font-size:16px;overscroll-behavior:none;font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;}
+html{background:#0c160e;overflow-x:hidden;}body{background:#0c160e;color:white;margin:0;padding:0;font-size:16px;overscroll-behavior:none;overflow-x:hidden;font-family:'Noto Sans JP',-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;}
 #root{min-height:100vh;min-height:100dvh;}
 button{font-family:inherit;touch-action:manipulation;-webkit-user-select:none;user-select:none;transition:scale .1s ease,filter .15s ease;}
 button:active{scale:.96;filter:brightness(1.15);}
@@ -4129,7 +4129,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.22")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.23")
         , React.createElement('button',{
             onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
             style:{background:"transparent",border:"none",cursor:"pointer",padding:"6px 6px",
@@ -4137,7 +4137,7 @@ function App() {
           }, appTheme==="dark"?"LIGHT":"DARK")
       )
 
-      , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px",order:3,overflowX:"clip"},}
+      , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px",order:3},}
 
         
         , isReadOnly && tab!=="live" && React.createElement('div', {style:{
@@ -4216,7 +4216,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.22")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.23")
         )
 
         // ===== 新規チーム作成 =====
@@ -4454,6 +4454,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.23",date:"2026/06/25",items:["全タブで画面外へのはみ出しを修正（body/htmlレベルで制御）"]},
                   {ver:"v473.22",date:"2026/06/25",items:["全タブのカードを横スクロール対応（画面外へのはみ出しを修正）"]},
                   {ver:"v473.21",date:"2026/06/25",items:["画面外へのはみ出しを修正"]},
                   {ver:"v473.17",date:"2026/06/25",items:["LA Lightをデフォルトテーマに・タブ/ヘッダーをLA Lightカラーに変更"]},
@@ -5877,6 +5878,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.23",date:"2026/06/25",items:["全タブで画面外へのはみ出しを修正（body/htmlレベルで制御）"]},
                   {ver:"v473.22",date:"2026/06/25",items:["全タブのカードを横スクロール対応（画面外へのはみ出しを修正）"]},
                   {ver:"v473.21",date:"2026/06/25",items:["画面外へのはみ出しを修正"]},
                   {ver:"v473.17",date:"2026/06/25",items:["LA Lightをデフォルトテーマに・タブ/ヘッダーをLA Lightカラーに変更"]},
