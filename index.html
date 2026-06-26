@@ -3964,7 +3964,7 @@ function App() {
   }
 
   return (
-    React.createElement('div', { style: Object.assign({},S.root,appTheme==="light"?{background:"#e8eef8",color:"#111"}:{background:"#000510",color:"#e8f0f8"}),}
+    React.createElement('div', { style: Object.assign({},S.root,appTheme==="light"?{background:"#e8eef8",color:"#111"}:{}),}
       , React.createElement('style', null, `
         @import url('https:
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -3977,7 +3977,7 @@ function App() {
       `)
 
       
-      , !isReadOnly && tab!=="login" && tab!=="login_new" && game && game.started && React.createElement('header', { style: Object.assign({},S.header,appTheme==="light"?{background:"linear-gradient(135deg,#001a4d,#003087)",borderBottom:"1px solid #002070"}:{}),}
+      , !isReadOnly && tab!=="login" && tab!=="login_new" && game && game.started && React.createElement('header', { style: S.header,}
         , React.createElement('div', { style: S.hRow,}
           , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0},}
             , React.createElement('span', { style: {fontSize:24,flexShrink:0},}, "⚾")
@@ -4106,34 +4106,30 @@ function App() {
       )
 
       
-      , React.createElement('nav', { style: Object.assign({},S.nav,{background:appTheme==="light"?"#003087":"#07100a",borderBottom:appTheme==="light"?"2px solid #002070":"1px solid #24402b",width:"100%"}),}
+      , React.createElement('nav', { style: S.nav,}
         , React.createElement('div',{style:{display:"flex",overflowX:"auto",flex:1,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}
         , tab!=="login" && (isReadOnly
-          ? [["top","🏠","ホーム"],["live","📡","速報"],["lineup","👕","オーダー"],["pitcher","⚾","投手"],["stats","📈","成績"],["history","🗂","履歴"],["share","📸","シェア"],["logout","⚙","設定"]].map(function(arr){var id=arr[0],icon=arr[1],lbl=arr[2];return(
-              React.createElement('button', { key: id, className: "thv", onClick: function(){setTab(id);}, style: {
+          ? [["top","🏠 トップ"],["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["share","📸 シェア"],["logout","⚙️ 設定"]].map(([id,l])=>(
+              React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
+                background:tab===id?"#1a2a45":"transparent",border:"none",borderRadius:"8px 8px 0 0",
+                borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
+                color:tab===id?"#fb923c":"#7db8e8",
+                padding:"12px 10px",cursor:"pointer",fontSize:13,whiteSpace:"nowrap",
+                fontWeight:tab===id?800:500,
+              },}, l)
+            ))
+          : [["top","🏠 トップ"],["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"],["share","📸 シェア"]].map(([id,l])=>(
+              React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
                 background:"transparent",border:"none",
-                borderBottom:tab===id?"2px solid "+(appTheme==="light"?"#c8102e":"#ef3e42"):"2px solid transparent",
-                color:tab===id?(appTheme==="light"?"#fff":"#5ab4ff"):(appTheme==="light"?"rgba(255,255,255,0.45)":"#1e3a5a"),
-                padding:"8px 4px 6px",cursor:"pointer",whiteSpace:"nowrap",fontWeight:700,
-                display:"flex",flexDirection:"column",alignItems:"center",gap:2,flex:1,minWidth:36,
-              }}
-              ,React.createElement("span",{style:{fontSize:15,lineHeight:1}},icon)
-              ,React.createElement("span",{style:{fontSize:9}},lbl)
-            );})
-          : [["top","🏠","ホーム"],["score","📊","スコア"],["lineup","👕","オーダー"],["pitcher","⚾","投手"],["stats","📈","成績"],["history","🗂","履歴"],["teams","🏟","チーム"],["share","📸","シェア"]].map(function(arr){var id=arr[0],icon=arr[1],lbl=arr[2];return(
-              React.createElement('button', { key: id, className: "thv", onClick: function(){setTab(id);}, style: {
-                background:"transparent",border:"none",
-                borderBottom:tab===id?"2px solid "+(appTheme==="light"?"#c8102e":"#ef3e42"):"2px solid transparent",
-                color:tab===id?(appTheme==="light"?"#fff":"#5ab4ff"):(appTheme==="light"?"rgba(255,255,255,0.45)":"#1e3a5a"),
-                padding:"8px 4px 6px",cursor:"pointer",whiteSpace:"nowrap",fontWeight:700,
-                display:"flex",flexDirection:"column",alignItems:"center",gap:2,flex:1,minWidth:36,
-              }}
-              ,React.createElement("span",{style:{fontSize:15,lineHeight:1}},icon)
-              ,React.createElement("span",{style:{fontSize:9}},lbl)
-            );})
+                borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
+                color:tab===id?"#7dd3fc":"#7db8e8",
+                padding:"10px 12px",cursor:"pointer",fontSize:12,whiteSpace:"nowrap",
+                fontWeight:tab===id?700:400,
+              },}, l)
+            ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.13")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.14")
         , React.createElement('button',{
             onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
             style:{background:"transparent",border:"none",cursor:"pointer",padding:"6px 6px",
@@ -4220,7 +4216,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.13")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.14")
         )
 
         // ===== 新規チーム作成 =====
@@ -4458,7 +4454,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v473.13",date:"2026/06/25",items:["タブをアイコン+テキスト化・DARK/LIGHTテーマ切り替え実装"]},
+                  {ver:"v473.14",date:"2026/06/25",items:["rootの背景テーマ切り替えテスト"]},
                   {ver:"v473.12",date:"2026/06/25",items:["テーマ切り替えボタン追加（動作確認用）"]},
                   {ver:"v473.08",date:"2026/06/25",items:["ヘッダーの保存・新試合ボタンを削除（自動保存・ホームから新試合）"]},
                   {ver:"v473.07",date:"2026/06/25",items:["試合未開始時はスコアヘッダー・操作ボタンを非表示に"]},
@@ -5878,7 +5874,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v473.13",date:"2026/06/25",items:["タブをアイコン+テキスト化・DARK/LIGHTテーマ切り替え実装"]},
+                  {ver:"v473.14",date:"2026/06/25",items:["rootの背景テーマ切り替えテスト"]},
                   {ver:"v473.12",date:"2026/06/25",items:["テーマ切り替えボタン追加（動作確認用）"]},
                   {ver:"v473.08",date:"2026/06/25",items:["ヘッダーの保存・新試合ボタンを削除（自動保存・ホームから新試合）"]},
                   {ver:"v473.07",date:"2026/06/25",items:["試合未開始時はスコアヘッダー・操作ボタンを非表示に"]},
