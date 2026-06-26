@@ -16,8 +16,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@600;700&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet"/>
 <style>
-body[data-theme="dark"]{--th-bg:#000510;--th-nav:#000a18;--th-nb:#0d2a4a;--th-hbg:linear-gradient(160deg,#000d1f,#001428 70%,#000510);--th-cb:#000d1f;--th-cbb:#0d2a4a;--th-ta:#5ab4ff;--th-ti:#1e3a5a;--th-tl:#ef3e42;--th-tx:#e8f0f8;--th-t2:#5ab4ff;--th-t3:#1e3a5a;--th-bd:#0d2a4a;--th-b2:#060e1c;--th-ib:#000a18;--th-mb:#000d1f;}
-body[data-theme="light"]{--th-bg:#e8eef8;--th-nav:#003087;--th-nb:#002070;--th-hbg:linear-gradient(135deg,#001a4d,#003087);--th-cb:#fff;--th-cbb:#b8c8e0;--th-ta:#fff;--th-ti:rgba(255,255,255,0.45);--th-tl:#c8102e;--th-tx:#111;--th-t2:#003087;--th-t3:#888;--th-bd:#b8c8e0;--th-b2:#dce6f5;--th-ib:#f0f5ff;--th-mb:#fff;}
+body[data-theme="dark"]{--th-bg:#000510;--th-nav:#000a18;--th-nb:#0d2a4a;--th-cb:#000d1f;--th-cbb:#0d2a4a;--th-ta:#5ab4ff;--th-ti:#1e3a5a;--th-tl:#ef3e42;--th-tx:#e8f0f8;--th-t2:#5ab4ff;--th-t3:#1e3a5a;--th-bd:#0d2a4a;--th-b2:#060e1c;--th-ib:#000a18;--th-mb:#000d1f;}
+body[data-theme="light"]{--th-bg:#e8eef8;--th-nav:#003087;--th-nb:#002070;--th-cb:#fff;--th-cbb:#b8c8e0;--th-ta:#fff;--th-ti:rgba(255,255,255,0.45);--th-tl:#c8102e;--th-tx:#111;--th-t2:#003087;--th-t3:#888;--th-bd:#b8c8e0;--th-b2:#dce6f5;--th-ib:#f0f5ff;--th-mb:#fff;}
 :root{color-scheme:dark;}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{-webkit-text-size-adjust:100%;}
@@ -30,7 +30,7 @@ input,select,textarea{font-family:inherit;}
 @media(prefers-reduced-motion:reduce){button{transition:none;}button:active{scale:1;}}
 </style>
 </head>
-<body>
+<body data-theme="dark">
 <div id="root"></div>
 <div id="__debug_console" style="display:none">
   <div id="__debug_log"></div>
@@ -2045,29 +2045,8 @@ function App() {
   const [statsTabTeamData, setStatsTabTeamData] = useState(null);
   const [statsTabLoading, setStatsTabLoading] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);
-  const [appTheme, setAppTheme] = useState(()=>localStorage.getItem("appTheme")||"dark");
-  // テーマトークン
-  var TH = appTheme==="dark" ? {
-    bg:"#000510", navBg:"#000a18", navBorder:"#0d2a4a",
-    headerBg:"linear-gradient(160deg,#000d1f 0%,#001428 70%,#000510 100%)",
-    headerBorder:"#0d2a4a",
-    cardBg:"#000d1f", cardBorder:"#0d2a4a",
-    tabActive:"#5ab4ff", tabInactive:"#1e3a5a", tabLine:"#ef3e42",
-    text:"#e8f0f8", text2:"#5ab4ff", text3:"#1e3a5a",
-    border:"#0d2a4a", border2:"#060e1c",
-    inputBg:"#000a18", mboxBg:"#000d1f",
-    awayCol:"#5ab4ff", homeCol:"#ef3e42",
-  } : {
-    bg:"#e8eef8", navBg:"#003087", navBorder:"#002070",
-    headerBg:"linear-gradient(135deg,#001a4d,#003087)",
-    headerBorder:"#002070",
-    cardBg:"#fff", cardBorder:"#b8c8e0",
-    tabActive:"#fff", tabInactive:"rgba(255,255,255,0.45)", tabLine:"#c8102e",
-    text:"#111", text2:"#003087", text3:"#888",
-    border:"#b8c8e0", border2:"#dce6f5",
-    inputBg:"#f0f5ff", mboxBg:"#fff",
-    awayCol:"#003087", homeCol:"#c8102e",
-  };
+  var themeArr = useState("dark");
+  var appTheme = themeArr[0]; var setAppTheme = themeArr[1];
   const [tbAwayRunner, setTbAwayRunner] = useState("");
   const [tbHomeRunner, setTbHomeRunner] = useState("");
   const isViewer = syncMode==="member";
@@ -2150,10 +2129,7 @@ function App() {
   }, [game.pitchMode]);
   useEffect(()=>{
     document.body.setAttribute("data-theme", appTheme);
-    localStorage.setItem("appTheme", appTheme);
   }, [appTheme]);
-  // 初期テーマ設定
-  React.useMemo(()=>{ document.body.setAttribute("data-theme", appTheme); }, []);
  useEffect(()=>{
     if(isHost && syncGameId) {
       if(!fbInit()){ showToast("Firebase未設定"); return; }
@@ -3993,7 +3969,7 @@ function App() {
   }
 
   return (
-    React.createElement('div', { style: Object.assign({},S.root,{background:"var(--th-bg,#000510)",color:"var(--th-tx,#e8f0f8)"}),}
+    React.createElement('div', { style: S.root,}
       , React.createElement('style', null, `
         @import url('https:
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -4006,7 +3982,7 @@ function App() {
       `)
 
       
-      , !isReadOnly && tab!=="login" && tab!=="login_new" && game && game.started && React.createElement('header', { style: Object.assign({},S.header,{background:"var(--th-hbg)",borderBottom:"1px solid var(--th-nb)"}),}
+      , !isReadOnly && tab!=="login" && tab!=="login_new" && game && game.started && React.createElement('header', { style: S.header,}
         , React.createElement('div', { style: S.hRow,}
           , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0},}
             , React.createElement('span', { style: {fontSize:24,flexShrink:0},}, "⚾")
@@ -4135,41 +4111,36 @@ function App() {
       )
 
       
-      , React.createElement('nav', { style: Object.assign({},S.nav,{background:"var(--th-nav,#000a18)",borderBottom:"2px solid var(--th-nb,#0d2a4a)"}),}
+      , React.createElement('nav', { style: S.nav,}
         , React.createElement('div',{style:{display:"flex",overflowX:"auto",flex:1,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}
         , tab!=="login" && (isReadOnly
-          ? [["top","🏠","ホーム"],["live","📡","速報"],["lineup","👕","オーダー"],["pitcher","⚾","投手"],["stats","📈","成績"],["history","🗂","履歴"],["share","📸","シェア"],["logout","⚙️","設定"]].map(([id,icon,lbl])=>(
+          ? [["top","🏠 トップ"],["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["share","📸 シェア"],["logout","⚙️ 設定"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
-                background:"transparent",border:"none",
-                borderBottom:tab===id?"2px solid var(--th-tl,#ef3e42)":"2px solid transparent",
-                color:tab===id?"var(--th-ta,#5ab4ff)":"var(--th-ti,#1e3a5a)",
-                padding:"8px 4px 6px",cursor:"pointer",whiteSpace:"nowrap",fontWeight:700,
-                display:"flex",flexDirection:"column",alignItems:"center",gap:2,
-                flex:1,minWidth:36,
-              }}
-              ,React.createElement("span",{style:{fontSize:16,lineHeight:1}},icon)
-              ,React.createElement("span",{style:{fontSize:9}},lbl)
+                background:tab===id?"#1a2a45":"transparent",border:"none",borderRadius:"8px 8px 0 0",
+                borderBottom:tab===id?"3px solid #f97316":"3px solid transparent",
+                color:tab===id?"#fb923c":"#7db8e8",
+                padding:"12px 10px",cursor:"pointer",fontSize:13,whiteSpace:"nowrap",
+                fontWeight:tab===id?800:500,
+              },}, l)
             ))
-          : [["top","🏠","ホーム"],["score","📊","スコア"],["lineup","👕","オーダー"],["pitcher","⚾","投手"],["stats","📈","成績"],["history","🗂","履歴"],["teams","🏟","チーム"],["share","📸","シェア"]].map(([id,icon,lbl])=>(
+          : [["top","🏠 トップ"],["score","📊 スコア"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["teams","🏟 チーム"],["share","📸 シェア"]].map(([id,l])=>(
               React.createElement('button', { key: id, className: "thv", onClick: ()=>setTab(id), style: {
                 background:"transparent",border:"none",
-                borderBottom:tab===id?"2px solid var(--th-tl,#ef3e42)":"2px solid transparent",
-                color:tab===id?"var(--th-ta,#5ab4ff)":"var(--th-ti,#1e3a5a)",
-                padding:"8px 4px 6px",cursor:"pointer",whiteSpace:"nowrap",fontWeight:700,
-                display:"flex",flexDirection:"column",alignItems:"center",gap:2,
-                flex:1,minWidth:36,
-              }}
-              ,React.createElement("span",{style:{fontSize:16,lineHeight:1}},icon)
-              ,React.createElement("span",{style:{fontSize:9}},lbl)
+                borderBottom:tab===id?"3px solid #3b82f6":"3px solid transparent",
+                color:tab===id?"#7dd3fc":"#7db8e8",
+                padding:"10px 12px",cursor:"pointer",fontSize:12,whiteSpace:"nowrap",
+                fontWeight:tab===id?700:400,
+              },}, l)
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#ef3e42",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap",opacity:0.8}}, "v473.09")
-        , React.createElement('button', {
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap",opacity:0.8}}, "v473.10")
+        , React.createElement('button',{
             onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
-            style:{background:"transparent",border:"none",cursor:"pointer",
-              fontSize:16,padding:"6px 4px 8px",lineHeight:1,flexShrink:0,alignSelf:"center"}
-          }, appTheme==="dark"?"X":"D")
+            style:{background:"transparent",border:"none",cursor:"pointer",padding:"6px 6px 8px",
+              fontSize:13,fontWeight:700,color:"#5ab4ff",flexShrink:0,alignSelf:"center",
+              lineHeight:1}
+          }, appTheme==="dark"?"LIGHT":"DARK")
       )
 
       , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px",order:3},}
@@ -4251,12 +4222,12 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:9,color:"#ef3e42",fontWeight:700,padding:"0 4px"}}, "v473.09")
-          , React.createElement('button', {
+          , React.createElement('div',{style:{fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px"}}, "v473.10")
+          , React.createElement('button',{
               onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
-              style:{background:"transparent",border:"none",cursor:"pointer",
-                fontSize:16,padding:"6px 4px 8px",lineHeight:1,flexShrink:0}
-            }, appTheme==="dark"?"X":"D")
+              style:{background:"transparent",border:"none",cursor:"pointer",padding:"6px 4px 8px",
+                fontSize:13,fontWeight:700,color:"#5ab4ff",flexShrink:0,lineHeight:1}
+            }, appTheme==="dark"?"LIGHT":"DARK")
         )
 
         // ===== 新規チーム作成 =====
@@ -4494,7 +4465,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v473.09",date:"2026/06/25",items:["LAカラーテーマ適用・タブ右端にDARK/LIGHTテーマ切り替えボタン追加"]},
+                  {ver:"v473.10",date:"2026/06/25",items:["タブ右端にDARK/LIGHTテーマ切り替えボタン追加"]},
                   {ver:"v473.08",date:"2026/06/25",items:["ヘッダーの保存・新試合ボタンを削除（自動保存・ホームから新試合）"]},
                   {ver:"v473.07",date:"2026/06/25",items:["試合未開始時はスコアヘッダー・操作ボタンを非表示に"]},
                   {ver:"v473.06",date:"2026/06/25",items:["タブを画面最上部に固定（ノッチ対応）"]},
@@ -5913,7 +5884,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
-                  {ver:"v473.09",date:"2026/06/25",items:["LAカラーテーマ適用・タブ右端にDARK/LIGHTテーマ切り替えボタン追加"]},
+                  {ver:"v473.10",date:"2026/06/25",items:["タブ右端にDARK/LIGHTテーマ切り替えボタン追加"]},
                   {ver:"v473.08",date:"2026/06/25",items:["ヘッダーの保存・新試合ボタンを削除（自動保存・ホームから新試合）"]},
                   {ver:"v473.07",date:"2026/06/25",items:["試合未開始時はスコアヘッダー・操作ボタンを非表示に"]},
                   {ver:"v473.06",date:"2026/06/25",items:["タブを画面最上部に固定（ノッチ対応）"]},
@@ -11463,13 +11434,13 @@ const sBt = (color, outline=false) => ({
 const S = {
   root:{
     minHeight:"100vh",
-    background:"#000510",
-    fontFamily:"'Noto Sans JP',sans-serif", color:"#e8f0f8", paddingBottom:60,
+    background:"linear-gradient(160deg,#07100a 0%,#0d1a2e 50%,#060c18 100%)",
+    fontFamily:"'Noto Sans JP',sans-serif", color:"#e9f0ea", paddingBottom:60,
     display:"flex", flexDirection:"column",
   },
   header:{
-    background:"linear-gradient(160deg,#000d1f 0%,#001428 70%,#000510 100%)",
-    borderBottom:"1px solid #0d2a4a",
+    background:"linear-gradient(180deg,#0f2040,#0c160e)",
+    borderBottom:"1px solid #24402b",
     padding:"12px 16px 10px",
     position:"sticky", top:"calc(env(safe-area-inset-top,0px) + 44px)", zIndex:90, order:2,
   },
@@ -11482,51 +11453,46 @@ const S = {
     display:"flex", alignItems:"center", gap:14, flexWrap:"wrap",
   },
   nav:{
-    background:"#000a18", borderBottom:"2px solid #0d2a4a",
+    background:"#07100a", borderBottom:"1px solid #24402b",
     display:"flex", maxWidth:860, margin:"0 auto",
     overflowX:"auto",
     padding:"calc(env(safe-area-inset-top,0px) + 4px) 4px 0",
     position:"sticky", top:0, zIndex:100, order:1,
   },
   card:{
-    background:"var(--th-cb,#000d1f)",
-    border:"1px solid var(--th-cbb,#0d2a4a)", borderRadius:12,
+    background:"linear-gradient(135deg,#122016,#0a1828)",
+    border:"1px solid #24402b", borderRadius:12,
     padding:16, marginBottom:14,
   },
-  ct:{ fontSize:14, fontWeight:700, color:"var(--th-t2,#5ab4ff)", marginBottom:12 },
+  ct:{ fontSize:14, fontWeight:700, color:"#7dd3fc", marginBottom:12 },
   si:{
-    background:"var(--th-ib,#000a18)", border:"1px solid var(--th-bd,#0d2a4a)", borderRadius:6,
-    color:"var(--th-tx,#e8f0f8)", padding:"5px 8px", fontSize:13, outline:"none",
-  },
-  inp:{
-    background:"#000a18", border:"1px solid #0d2a4a", borderRadius:6,
-    color:"#e8f0f8", padding:"5px 8px", fontSize:13, outline:"none",
-    width:"100%",
+    background:"#24402b", border:"1px solid #33573c", borderRadius:6,
+    color:"#e9f0ea", padding:"5px 8px", fontSize:13, outline:"none",
   },
   table:{ width:"100%", borderCollapse:"collapse", minWidth:440 },
   th:{
-    padding:"7px 4px", textAlign:"center", fontSize:11, color:"var(--th-t3,#1e3a5a)",
-    fontWeight:700, borderBottom:"1px solid #0d2a4a", whiteSpace:"nowrap",
+    padding:"7px 4px", textAlign:"center", fontSize:11, color:"#74897b",
+    fontWeight:700, borderBottom:"1px solid #24402b", whiteSpace:"nowrap",
   },
-  td:{ padding:"6px 4px", fontSize:13, borderBottom:"1px solid var(--th-b2,#060e1c)" },
+  td:{ padding:"6px 4px", fontSize:13, borderBottom:"1px solid #0f2040" },
   overlay:{
-    position:"fixed", inset:0, background:"rgba(0,0,0,.92)",
+    position:"fixed", inset:0, background:"rgba(0,0,0,.88)",
     display:"flex", alignItems:"center", justifyContent:"center",
     zIndex:200, padding:16,
   },
   mBox:{
-    background:"var(--th-mb,#000d1f)",
-    border:"1px solid var(--th-cbb,#0d2a4a)", borderRadius:16,
+    background:"linear-gradient(135deg,#0f2040,#0c160e)",
+    border:"1px solid #33573c", borderRadius:16,
     padding:20, maxWidth:400, width:"100%", maxHeight:"92vh", overflowY:"auto",
   },
-  mt:{ fontSize:15, fontWeight:700, color:"var(--th-t2,#5ab4ff)" },
+  mt:{ fontSize:15, fontWeight:700, color:"#7dd3fc" },
   backBtn:{
-    background:"transparent", border:"none", color:"#5ab4ff",
+    background:"transparent", border:"none", color:"#7db8e8",
     cursor:"pointer", fontSize:20, padding:"0 4px", lineHeight:1,
   },
   cBtn:{
     marginTop:8, width:"100%", background:"transparent",
-    border:"1px solid var(--th-bd,#0d2a4a)", borderRadius:8, color:"var(--th-t2,#5ab4ff)",
+    border:"1px solid #33573c", borderRadius:8, color:"#7db8e8",
     padding:"8px", cursor:"pointer", fontSize:13,
   },
   toast:{
