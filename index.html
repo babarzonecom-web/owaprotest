@@ -4129,7 +4129,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.27")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.28")
         , React.createElement('button',{
             onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
             style:{background:"transparent",border:"none",cursor:"pointer",padding:"6px 6px",
@@ -4216,7 +4216,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.27")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.28")
         )
 
         // ===== 新規チーム作成 =====
@@ -4454,6 +4454,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.28",date:"2026/06/25",items:["シェアタブのレンダリングエラーを修正（appTheme未定義）"]},
                   {ver:"v473.27",date:"2026/06/25",items:["スクロール時にヘッダーが動く問題を修正"]},
                   {ver:"v473.26",date:"2026/06/25",items:["タブ位置修正・ライトモードの文字色改善（ログ・前打者・選手ボタン）"]},
                   {ver:"v473.25",date:"2026/06/25",items:["全タブで画面外はみ出し問題を根本修正（flexレイアウトを元に戻す）"]},
@@ -5882,6 +5883,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.28",date:"2026/06/25",items:["シェアタブのレンダリングエラーを修正（appTheme未定義）"]},
                   {ver:"v473.27",date:"2026/06/25",items:["スクロール時にヘッダーが動く問題を修正"]},
                   {ver:"v473.26",date:"2026/06/25",items:["タブ位置修正・ライトモードの文字色改善（ログ・前打者・選手ボタン）"]},
                   {ver:"v473.25",date:"2026/06/25",items:["全タブで画面外はみ出し問題を根本修正（flexレイアウトを元に戻す）"]},
@@ -6218,7 +6220,8 @@ function App() {
               sharePitcherMap:sharePitcherMap,
               shareBattingMap:shareBattingMap,
               onClose:function(){setTab("top");},
-              asTab:true
+              asTab:true,
+              appTheme:appTheme
             })
         )
 
@@ -8102,6 +8105,7 @@ function ShareCardModal(props) {
   var asTab = props.asTab || false;
   var sharePitcherMap = props.sharePitcherMap || {};
   var shareBattingMap = props.shareBattingMap || {};
+  var appTheme = props.appTheme || "light";
 
   var modeState = useState("game");
   var mode = modeState[0]; var setMode = modeState[1];
