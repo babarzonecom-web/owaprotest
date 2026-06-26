@@ -4106,7 +4106,7 @@ function App() {
       )
 
       
-      , React.createElement('nav', { style: Object.assign({},S.nav,{background:appTheme==="light"?"#003087":"#07100a",borderBottom:appTheme==="light"?"2px solid #002070":"1px solid #24402b",width:"100%"}),}
+      , React.createElement('nav', { style: Object.assign({},S.nav,{background:appTheme==="light"?"#003087":"#07100a",borderBottom:appTheme==="light"?"2px solid #002070":"1px solid #24402b"}),}
         , React.createElement('div',{style:{display:"flex",overflowX:"auto",flex:1,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}
         , tab!=="login" && (isReadOnly
           ? [["top","🏠 トップ"],["live","📡 速報"],["lineup","👕 オーダー"],["pitcher","⚾ 投手"],["stats","📈 成績"],["history","🗂 履歴"],["share","📸 シェア"],["logout","⚙️ 設定"]].map(([id,l])=>(
@@ -4129,7 +4129,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.24")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.25")
         , React.createElement('button',{
             onClick:function(){setAppTheme(function(t){return t==="dark"?"light":"dark";});},
             style:{background:"transparent",border:"none",cursor:"pointer",padding:"6px 6px",
@@ -4137,7 +4137,7 @@ function App() {
           }, appTheme==="dark"?"LIGHT":"DARK")
       )
 
-      , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px",order:3},}
+      , React.createElement('main', { style: {maxWidth:860,margin:"0 auto",padding:"12px 12px 60px"},}
 
         
         , isReadOnly && tab!=="live" && React.createElement('div', {style:{
@@ -4216,7 +4216,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.24")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.25")
         )
 
         // ===== 新規チーム作成 =====
@@ -4454,6 +4454,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.25",date:"2026/06/25",items:["全タブで画面外はみ出し問題を根本修正（flexレイアウトを元に戻す）"]},
                   {ver:"v473.24",date:"2026/06/25",items:["成績テーブルの横スクロールを復活・ライトモードのテーブル文字色を修正"]},
                   {ver:"v473.23",date:"2026/06/25",items:["全タブで画面外へのはみ出しを修正（body/htmlレベルで制御）"]},
                   {ver:"v473.22",date:"2026/06/25",items:["全タブのカードを横スクロール対応（画面外へのはみ出しを修正）"]},
@@ -5879,6 +5880,7 @@ function App() {
                 , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#fb923c"}}, "運営からのお知らせ")
               )
               , [
+                  {ver:"v473.25",date:"2026/06/25",items:["全タブで画面外はみ出し問題を根本修正（flexレイアウトを元に戻す）"]},
                   {ver:"v473.24",date:"2026/06/25",items:["成績テーブルの横スクロールを復活・ライトモードのテーブル文字色を修正"]},
                   {ver:"v473.23",date:"2026/06/25",items:["全タブで画面外へのはみ出しを修正（body/htmlレベルで制御）"]},
                   {ver:"v473.22",date:"2026/06/25",items:["全タブのカードを横スクロール対応（画面外へのはみ出しを修正）"]},
@@ -11437,13 +11439,12 @@ const S = {
     minHeight:"100vh",
     background:"linear-gradient(160deg,#07100a 0%,#0d1a2e 50%,#060c18 100%)",
     fontFamily:"'Noto Sans JP',sans-serif", color:"#e9f0ea", paddingBottom:60,
-    display:"flex", flexDirection:"column",
   },
   header:{
     background:"linear-gradient(180deg,#0f2040,#0c160e)",
     borderBottom:"1px solid #24402b",
     padding:"12px 16px 10px",
-    position:"sticky", top:"calc(env(safe-area-inset-top,0px) + 44px)", zIndex:90, order:2,
+    position:"sticky", top:"calc(env(safe-area-inset-top,0px) + 44px)", zIndex:90,
   },
   hRow:{
     maxWidth:860, margin:"0 auto",
@@ -11455,10 +11456,10 @@ const S = {
   },
   nav:{
     background:"#07100a", borderBottom:"1px solid #24402b",
-    display:"flex", width:"100%",
+    display:"flex", maxWidth:860, margin:"0 auto",
     overflowX:"auto",
     padding:"calc(env(safe-area-inset-top,0px) + 4px) 4px 0",
-    position:"sticky", top:0, zIndex:100, order:1,
+    position:"sticky", top:0, zIndex:100,
   },
   card:{
     background:"linear-gradient(135deg,#122016,#0a1828)",
