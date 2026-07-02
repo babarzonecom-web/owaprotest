@@ -3542,9 +3542,10 @@ function App() {
   };
 
   const endGame = useCallback((reason, endInning, endNote, pitcherResults)=>{
-    mutGame(g=>{
+    // mutGameとsetStorageを1つのsetStorage呼び出しにまとめる（state競合防止）
+    setStorage(s=>{
       const pr = pitcherResults||{};
-      const applyRunsToSide = (side) => {
+      const applyRunsToSide = (g, side) => {
         const ps = [...(g[side+"Pitchers"]||[])];
         ps.forEach((p,i)=>{
           const r = pr[p.name]||{};
@@ -3553,37 +3554,40 @@ function App() {
         });
         return ps;
       };
-      return {...g, finished:true, endReason:reason, endInning, endNote:endNote||"",
+      const snap = JSON.parse(JSON.stringify(s.currentGame));
+      const finishedGame = {...s.currentGame, finished:true, endReason:reason, endInning, endNote:endNote||"",
         pitcherResults:pr,
-        awayPitchers: applyRunsToSide("away"),
-        homePitchers: applyRunsToSide("home"),
-        finalOuts: g.outs, finalInning: g.inning, finalHalf: g.half,
-        awayPitcherIdx: -1, homePitcherIdx: -1};
-    });
-    
-    setStorage(s=>{
-      const finished = {...s.currentGame, finished:true, endReason:reason, endInning, endNote:endNote||"",
-        pitcherResults: pitcherResults||{},
+        awayPitchers: applyRunsToSide(s.currentGame, "away"),
+        homePitchers: applyRunsToSide(s.currentGame, "home"),
+        finalOuts: s.currentGame.outs, finalInning: s.currentGame.inning, finalHalf: s.currentGame.half,
+        awayPitcherIdx: -1, homePitcherIdx: -1,
         savedAt:new Date().toLocaleString("ja-JP")};
+      const newUndoStack = [snap, ...(s.undoStack||[])];
 
-      // チームコード管理者なら team_rooms に保存（メインの共有ストレージ）
-      const g = finished;
+      // Firebase保存
       if(window.__teamShareRole==="admin" && window.__teamShareCode){
-        fbSaveGameToCode(window.__teamShareCode, g);
-        fbSaveHistory(window.__teamShareCode, g);
+        try {
+          window.__teamAdminPushing = true;
+          fetch("https://owaprobaseball-default-rtdb.asia-southeast1.firebasedatabase.app/team_rooms/"+window.__teamShareCode+"/currentGame.json",{
+            method:"PUT",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(Object.assign({},finishedGame,{_ts:Date.now()}))
+          }).then(function(){ setTimeout(function(){ window.__teamAdminPushing=false; },2000); })
+          .catch(function(e){ console.error("[TEAM] push error",e); window.__teamAdminPushing=false; });
+        } catch(e) {}
+        fbSaveGameToCode(window.__teamShareCode, finishedGame);
+        fbSaveHistory(window.__teamShareCode, finishedGame);
       }
-      // 旧来の shared_teams への保存も維持（後方互換）
       const allTeams = [...(s.teams||[]), ...(s.myTeam?[s.myTeam]:[]), ...(s.opponents||[])];
-      const matchedTeam = allTeams.find(t=>t.name===g.awayTeam||t.name===g.homeTeam);
-      if(matchedTeam) fbSaveTeamGame(matchedTeam.id, g);
+      const matchedTeam = allTeams.find(t=>t.name===finishedGame.awayTeam||t.name===finishedGame.homeTeam);
+      if(matchedTeam) fbSaveTeamGame(matchedTeam.id, finishedGame);
 
-      const hist = [finished, ...(s.history||[]).filter(h=>h.id!==finished.id)]
+      const hist = [finishedGame, ...(s.history||[]).filter(h=>h.id!==finishedGame.id)]
         .sort((a,b)=>{ const ta=a.date||a.savedAt||""; const tb=b.date||b.savedAt||""; return tb.localeCompare(ta)||(b._ts||0)-(a._ts||0); })
         .slice(0,100);
-      return {...s, history:hist};
+      return {...s, currentGame: finishedGame, undoStack: newUndoStack, history:hist};
     });
     showToast(reason==="cold"?`コールドゲーム（${endInning}回）`:reason==="mercy"?"コールド成立":"⚾ 試合終了");
-  },[mutGame]);
+  },[]);
 
   const resumeGame = useCallback(()=>{
     mutGame(g=>({...g, finished:false, endReason:"", endInning:null, endNote:""}));
@@ -4129,7 +4133,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.34")
+        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.37")
         
       )
 
@@ -4212,7 +4216,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.34")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.37")
         )
 
         // ===== 新規チーム作成 =====
@@ -4684,7 +4688,7 @@ function App() {
                           var _cHalf=g.half||"top";
                           var _aT=_aTotal, _hT=_hTotal;
                           var _sayonara=_fin&&_hT>_aT&&(g.homeScore[_inn]!==""&&g.homeScore[_inn]!==undefined);
-                          var _lastX=_fin&&_aT>_hT&&(g.homeScore[_inn]===""||g.homeScore[_inn]===undefined);
+                          var _lastX=_fin&&_aT!==_hT&&(g.homeScore[_inn]===""||g.homeScore[_inn]===undefined);
                           return [
                             {label:g.awayTeam||"Away",score:g.awayScore||{},total:_aTotal,color:"#ffb52e",team:"away"},
                             {label:g.homeTeam||"Home",score:g.homeScore||{},total:_hTotal,color:"#7dd3fc",team:"home"},
@@ -4705,12 +4709,14 @@ function App() {
                                   s=(raw!==""&&raw!==undefined&&raw!==null)?String(raw):"";
                                 }
                                 var _sy=_sayonara&&row.team==="home"&&i===_inn&&s!==""&&s!=="×";
+                                var _isCold=_fin&&(g.endReason==="cold"||g.endReason==="weather"||g.endReason==="dark");
+                                var _coldEnd=_isCold&&i===(g.endInning||_inn)&&s!==""&&s!==undefined;
                                 return React.createElement('td',{key:i,style:{
                                   textAlign:"center",padding:"3px 4px",
                                   fontSize:s==="×"?10:13,fontWeight:700,
                                   color:s==="×"?"#74897b":(parseInt(s)>0)?"#fff":"#2e4234",
                                   background:i===g.inning?"rgba(255,255,255,0.05)":"transparent"
-                                }},_sy?(s+"×"):s||((!_fin&&i===_cInn)?"":(_fin?"":"")));
+                                }},_sy?(s+"×"):_coldEnd?(s+"×"):s||((!_fin&&i===_cInn)?"":(_fin?"":"")));
                               })
                               ,React.createElement('td',{style:{textAlign:"center",fontWeight:900,fontSize:16,color:row.color,padding:"3px 6px"}},row.total)
                             );
@@ -5011,6 +5017,9 @@ function App() {
                     var sayonara=finished&&homeTotal2>awayTotal2&&(game.homeScore[inn]!==""&&game.homeScore[inn]!==undefined)&&game.awayScore[inn]!==undefined;
                     // 最終回裏不要判定：先攻リード or 同点以上で試合終了し、homeScore[inn]が空
                     var lastUraUnneeded=finished&&(game.homeScore[inn]===""||game.homeScore[inn]===undefined)&&awayTotal2!==homeTotal2;
+                    // コールド判定
+                    var isCold=finished&&(game.endReason==="cold"||game.endReason==="weather"||game.endReason==="dark");
+                    var coldInning=isCold?(game.endInning||inn):null;
                     return [
                       {team:"away",label:game.awayTeam,score:game.awayScore,total:awayTotal,hits:awayHitsTotal,errs:awayErrsTotal,color:"#ffb52e"},
                       {team:"home",label:game.homeTeam,score:game.homeScore,total:homeTotal,hits:homeHitsTotal,errs:homeErrsTotal,color:"#7dd3fc"},
@@ -5041,9 +5050,10 @@ function App() {
                           }
                           // サヨナラ：後攻の最終回に×を付加
                           var showSayonara=sayonara&&row.team==="home"&&i===inn&&scoreStr!==""&&scoreStr!=="×";
+                          var isColdEnd=isCold&&i===coldInning&&scoreStr!==""&&scoreStr!==undefined;
                           return React.createElement('td', { key: i, style: {...(appTheme==="light"?S.tdL:S.td),padding:2,textAlign:"center"},}
                             , React.createElement('span', { style: {fontSize:scoreStr==="×"?13:16,fontWeight:700,color:scoreStr==="×"?"#74897b":"#fff",display:"block",padding:"4px 0"},}
-                              , showSayonara?(scoreStr+"×"):scoreStr
+                              , showSayonara?(scoreStr+"×"):isColdEnd?(scoreStr+"×"):scoreStr
                             )
                           );
                         })
@@ -8357,7 +8367,7 @@ function ShareCardModal(props) {
             var _fin=!!(game&&game.finished);
             var _inn=game?(game.innings||9):9;
             var _aT=awayScore; var _hT=homeScore;
-            var _lastX=_fin&&_aT>_hT&&(game.homeScore[_inn]===""||game.homeScore[_inn]===undefined||game.homeScore[_inn]===null);
+            var _lastX=_fin&&_aT!==_hT&&(game.homeScore[_inn]===""||game.homeScore[_inn]===undefined||game.homeScore[_inn]===null);
             var _say=_fin&&_hT>_aT&&(game.homeScore[_inn]!==""&&game.homeScore[_inn]!==undefined&&game.homeScore[_inn]!==null);
             var raw=(game&&game.awayScore)?game.awayScore[i]:"";
             var s=(raw!==""&&raw!==undefined&&raw!==null)?String(raw):"";
@@ -8370,14 +8380,16 @@ function ShareCardModal(props) {
             var _fin=!!(game&&game.finished);
             var _inn=game?(game.innings||9):9;
             var _aT=awayScore; var _hT=homeScore;
-            var _lastX=_fin&&_aT>_hT&&(game.homeScore[_inn]===""||game.homeScore[_inn]===undefined||game.homeScore[_inn]===null);
+            var _lastX=_fin&&_aT!==_hT&&(game.homeScore[_inn]===""||game.homeScore[_inn]===undefined||game.homeScore[_inn]===null);
             var _say=_fin&&_hT>_aT&&(game.homeScore[_inn]!==""&&game.homeScore[_inn]!==undefined&&game.homeScore[_inn]!==null);
             var raw=(game&&game.homeScore)?game.homeScore[i]:"";
             var s="";
             if(i===_inn&&_lastX) s="×";
             else s=(raw!==""&&raw!==undefined&&raw!==null)?String(raw):"";
             var showSay=_say&&i===_inn&&s!==""&&s!=="×";
-            return React.createElement("div",{key:i,style:{flex:1,textAlign:"center",padding:"3px 1px",fontFamily:"'Bebas Neue',sans-serif",fontSize:s==="×"?9:12,color:s==="×"?"#888":(T.txt==="#111"?"#888":"#ccc")}},showSay?(s+"×"):s);})
+            var _isColdS=_fin&&(game.endReason==="cold"||game.endReason==="weather"||game.endReason==="dark");
+            var _coldEndS=_isColdS&&i===(game.endInning||_inn)&&s!==""&&s!==undefined&&s!=="×";
+            return React.createElement("div",{key:i,style:{flex:1,textAlign:"center",padding:"3px 1px",fontFamily:"'Bebas Neue',sans-serif",fontSize:s==="×"?9:12,color:s==="×"?"#888":(T.txt==="#111"?"#888":"#ccc")}},showSay?(s+"×"):_coldEndS?(s+"×"):s);})
           ,React.createElement("div",{style:{flex:1.3,textAlign:"center",padding:"3px 1px",borderLeft:"1px solid #181818",fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:T.txt==="#111"?"#333":T.hCol}},homeScore)
         )
       )
