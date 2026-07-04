@@ -1566,6 +1566,15 @@ const computePitcherStats = (g) => { // 🔒 LOCKED - v447/v468仕様 変更禁�
       }
     });
 
+    // v473.38: 走塁による得点（本盗・WP・PB・BK等、recordSBでbaserunnerRunsに記録）を失点に加算
+    // 旧データはbaserunnerRunsが存在しないため挙動不変。Firebase経由のオブジェクト化にも防御
+    const _brRunsList = Array.isArray(g.baserunnerRuns) ? g.baserunnerRuns : (g.baserunnerRuns ? Object.values(g.baserunnerRuns) : []);
+    _brRunsList.forEach(br=>{
+      if(br.defTeam !== defTeam) return;
+      const ps = stats[br.pitcherIdx];
+      if(ps) ps.autoRuns = (ps.autoRuns||0) + (br.runs||0);
+    });
+
     
     
     allAtBats.forEach(ab=>{
@@ -1606,7 +1615,10 @@ const computePitcherStats = (g) => { // 🔒 LOCKED - v447/v468仕様 変更禁�
 
     // 試合終了時のアウト補正
     // 最終投手にfinalOutsまでのアウトを補完（試合終了ボタンで記録漏れを防ぐ）
-    if(g.finished && g.finalOuts !== undefined && g.finalHalf !== undefined) {
+    // v473.38: finalHalfで守備していたチームのみ対象（top=home守備, bottom=away守備）。
+    // 攻撃側チームに幽霊アウトが付くバグを修正
+    const _wasDefendingFinalHalf = g.finalHalf==="top" ? defTeam==="home" : defTeam==="away";
+    if(g.finished && g.finalOuts !== undefined && g.finalHalf !== undefined && _wasDefendingFinalHalf) {
       // 最終ハーフの総アウト数を計算（allAtBatsから）
       const finalHalfOuts = allAtBats.filter(ab =>
         ab.inning === g.finalInning && ab.half === g.finalHalf && OUT_CODES_FOR_IP.has(ab.entry.code) && !ab.hasError
@@ -1622,7 +1634,11 @@ const computePitcherStats = (g) => { // 🔒 LOCKED - v447/v468仕様 変更禁�
       const expectedOuts = g.finalOuts;
       if(totalFinalOuts < expectedOuts) {
         // 差分を「実際に最後に投げている投手」に補完(配列末尾だと未登板投手に付く不具合を回避)
-        const lastPitcher = stats[currentPIdx] || (stats.length > 0 ? stats[stats.length - 1] : null);
+        // v473.38: finished時はPitcherIdxが-1のためstats[-1]は常にundefined→末尾フォールバックが常用される
+        // バグを修正。seqLog末尾（fromSeq最大＝実際の最終登板投手）を優先的に使う
+        const _seqLastIdx = seqLog.length > 0 ? seqLog[seqLog.length - 1].pitcherIdx : -1;
+        const lastPitcher = (currentPIdx >= 0 && stats[currentPIdx]) ? stats[currentPIdx]
+          : (stats[_seqLastIdx] || (stats.length > 0 ? stats[stats.length - 1] : null));
         if(lastPitcher) {
           const diff = expectedOuts - totalFinalOuts;
           lastPitcher._outsGot += diff;
@@ -1640,6 +1656,115 @@ const computePitcherStats = (g) => { // 🔒 LOCKED - v447/v468仕様 変更禁�
 // ================================================================
 // 🔒 LOCKED ZONE END
 // ================================================================
+
+// ================================================================
+// 🧪 SELF TEST（成績計算の回帰テスト）
+// LOCKED ZONEの挙動を固定シナリオで検証する。
+// - アプリ内: 管理者ホームのバージョン番号タップ→開発者パスワード入力で実行
+// - Claude側: regression-test.js がこの関数を抽出してzip作成前に実行
+// 期待値を変える場合は「野球公式規則に照らして正しいか」を必ず確認すること。
+// ================================================================
+const DEV_PASS = "bonchiosamu"; // 開発者専用パスワード（自己診断の入り口）
+const OWAPRO_SELF_TEST = function(){
+  var results = [];
+  var T = function(name, cond, detail, knownBugId){ results.push({name:name, pass:!!cond, detail:String(detail||""), knownBugId:knownBugId||null}); };
+  var mkP = function(name, atBats){ return {name:name, atBats:atBats}; };
+  try {
+    // ---- 打撃成績（computeStats） ----
+    var rows = computeStats([
+      mkP("A",{1:[{code:"H1"},{code:"K"}],2:[{code:"BB"},{code:"HR",runs:1}]}),
+      mkP("B",{1:[{code:"KW"}],2:[{code:"SF"},{code:"GO"}]}),
+      mkP("C",{1:[{code:"GO"},{code:"FO"},{code:"K"},{code:"DP"}]})
+    ]);
+    var A=rows[0], B=rows[1], C=rows[2];
+    T("打撃:打数・安打・打率", A._ab===3&&A._h===2&&A._avg===".667", A._ab+"/"+A._h+"/"+A._avg);
+    T("打撃:四球は打数外・打席に含む", A._bb===1&&A._pa===4, A._bb+"/"+A._pa);
+    T("打撃:長打率・出塁率", A._slg==="1.667"&&A._obp===".750", A._slg+"/"+A._obp);
+    T("打撃:振り逃げ=打数+三振", B._ab===2&&B._k===1&&B._pa===3, B._ab+"/"+B._k+"/"+B._pa);
+    T("打撃:併殺打も打数・打率.000表記", C._ab===4&&C._avg===".000"&&C._k===1, C._ab+"/"+C._avg);
+
+    // ---- 得点再計算（recomputeScores） ----
+    var rg = recomputeScores({innings:2,
+      awayScore:{1:"3",2:"0"}, homeScore:{1:"0",2:"0"},
+      awayLineup:[{atBats:{1:[{code:"H1",runs:2}],2:[{code:"HR",runs:1}]}}],
+      homeLineup:[{atBats:{1:[{code:"GO"}]}}]});
+    T("得点:打席runs+盗塁分extra保持", rg.awayScore[1]===3&&rg.awayScore[2]===1, rg.awayScore[1]+"/"+rg.awayScore[2]);
+    T("得点:相手側に影響なし", rg.homeScore[1]===0, rg.homeScore[1]);
+
+    // ---- 投手成績（computePitcherStats） ----
+    var basePLog = function(half){ return [{pitcherIdx:0, fromInning:1, fromHalf:half, outsAtStart:0, atBatSeq:0}]; };
+    // P1: サヨナラ終了（裏1死）で攻撃側チーム投手に幽霊アウトが付かない
+    var p1 = computePitcherStats({innings:7, finished:true, finalOuts:1, finalInning:7, finalHalf:"bottom",
+      awayPitcherIdx:-1, homePitcherIdx:-1,
+      awayPitchers:[{name:"A先発"},{name:"Aベンチ"}], homePitchers:[{name:"H先発"},{name:"Hベンチ"}],
+      awayPitcherLog:basePLog("bottom"), homePitcherLog:basePLog("top"),
+      awayLineup:[mkP("a1",{7:[{code:"GO",pLogIdx:0}]}),mkP("a2",{7:[{code:"GO",pLogIdx:0}]}),mkP("a3",{7:[{code:"GO",pLogIdx:0}]})],
+      homeLineup:[mkP("h1",{7:[{code:"GO",pLogIdx:0}]}),mkP("h2",{7:[{code:"H1",runs:1,pLogIdx:0}]})],
+      baserunnerOuts:[]});
+    T("投手:サヨナラ幽霊アウトなし", p1.home[0]._outsGot===3&&p1.home[1]._outsGot===0&&p1.away[0]._outsGot===1&&p1.away[1]._outsGot===0,
+      p1.home[0]._outsGot+","+p1.home[1]._outsGot+"/"+p1.away[0]._outsGot+","+p1.away[1]._outsGot);
+    // P2: 終了時アウト補完はベンチ投手ではなく最終登板投手へ
+    var p2 = computePitcherStats({innings:7, finished:true, finalOuts:3, finalInning:7, finalHalf:"bottom",
+      awayPitcherIdx:-1, homePitcherIdx:-1,
+      awayPitchers:[{name:"A先発"},{name:"A2番手"},{name:"Aベンチ"}], homePitchers:[{name:"H先発"}],
+      awayPitcherLog:[{pitcherIdx:0, fromInning:1, fromHalf:"bottom", outsAtStart:0, atBatSeq:0},{pitcherIdx:1, fromInning:7, fromHalf:"bottom", outsAtStart:0, atBatSeq:1}],
+      homePitcherLog:basePLog("top"),
+      awayLineup:[mkP("a1",{7:[{code:"GO",pLogIdx:0}]})],
+      homeLineup:[mkP("h1",{1:[{code:"GO",pLogIdx:0}]}),mkP("h2",{7:[{code:"GO",pLogIdx:1}]}),mkP("h3",{7:[{code:"FO",pLogIdx:1}]})],
+      baserunnerOuts:[]});
+    T("投手:補完は最終登板投手へ", p2.away[1]._outsGot===3&&p2.away[2]._outsGot===0, p2.away.map(function(x){return x._outsGot;}).join(","));
+    // P3: 本盗等（baserunnerRuns）が失点に加算・旧データは挙動不変
+    var g3base = {innings:7, finished:false, awayPitcherIdx:0, homePitcherIdx:0,
+      awayPitchers:[{name:"A先発"}], homePitchers:[{name:"H先発"}],
+      awayPitcherLog:basePLog("bottom"), homePitcherLog:basePLog("top"),
+      awayLineup:[mkP("a1",{1:[{code:"H1",pLogIdx:0}]})], homeLineup:[mkP("h1",{1:[{code:"GO",pLogIdx:0}]})],
+      baserunnerOuts:[], baserunnerRuns:[{inning:1, half:"top", defTeam:"home", pitcherIdx:0, runs:1}]};
+    var p3 = computePitcherStats(g3base);
+    T("投手:本盗の失点加算", p3.home[0].autoRuns===1&&(p3.away[0].autoRuns||0)===0, p3.home[0].autoRuns+"/"+(p3.away[0].autoRuns||0));
+    var g4 = {}; for(var k4 in g3base){ g4[k4]=g3base[k4]; } g4.baserunnerRuns=undefined;
+    var p4 = computePitcherStats(g4);
+    T("投手:旧データ(baserunnerRunsなし)非退行", (p4.home[0].autoRuns||0)===0, (p4.home[0].autoRuns||0));
+    // P5: 振り逃げも奪三振・併殺は2アウト
+    var p5 = computePitcherStats({innings:7, finished:false, awayPitcherIdx:0, homePitcherIdx:0,
+      awayPitchers:[{name:"A先発"}], homePitchers:[{name:"H先発"}],
+      awayPitcherLog:basePLog("bottom"), homePitcherLog:basePLog("top"),
+      awayLineup:[mkP("a1",{1:[{code:"KW",pLogIdx:0},{code:"DP",pLogIdx:0},{code:"K",pLogIdx:0}]})],
+      homeLineup:[mkP("h1",{1:[{code:"GO",pLogIdx:0}]})],
+      baserunnerOuts:[]});
+    T("投手:振り逃げも奪三振・併殺2アウト", p5.home[0].autoK===2&&p5.home[0]._outsGot===3, p5.home[0].autoK+"/"+p5.home[0]._outsGot);
+
+    // ---- 既知の未修正バグ（13〜15件目・knownBugId付き。直るまで⚠️扱いでzipは止めない）----
+    // ⑤ 継投時の失点帰属：出塁を許した投手ではなく現在登板中の投手に付いてしまう
+    var p6 = computePitcherStats({innings:1, finished:false, awayPitcherIdx:0, homePitcherIdx:1,
+      awayPitchers:[{name:"敵投手"}], homePitchers:[{name:"A"},{name:"B"}],
+      awayPitcherLog:basePLog("bottom"),
+      homePitcherLog:[{pitcherIdx:0,fromInning:1,fromHalf:"top",outsAtStart:0,atBatSeq:0},{pitcherIdx:1,fromInning:1,fromHalf:"top",outsAtStart:0,atBatSeq:1}],
+      awayLineup:[mkP("b1",{1:[{code:"BB",pLogIdx:0}]}),mkP("b2",{1:[{code:"H2",runs:1,pLogIdx:1}]})],
+      homeLineup:[mkP("h1",{1:[]})], baserunnerOuts:[]});
+    T("[既知#5]投手:継投時は出塁を許した投手に失点計上", p6.home[0].autoRuns===1, "A="+(p6.home[0].autoRuns||0)+" B="+(p6.home[1].autoRuns||0), "PITCHER_RUN_ATTRIBUTION");
+
+    // ⑥ recomputeScores：打席runsを下方修正しても得点が下がらない
+    var g6a = {innings:1, awayScore:{1:"3"}, homeScore:{}, awayLineup:[mkP("a1",{1:[{code:"H1",runs:2}]})], homeLineup:[]};
+    var r6a = recomputeScores(g6a);
+    var g6b = {...g6a, awayScore:r6a.awayScore, awayLineup:[mkP("a1",{1:[{code:"H1",runs:1}]})]};
+    var r6b = recomputeScores(g6b);
+    T("[既知#6]得点:打席runsの下方修正が反映される", r6b.awayScore[1]===2, r6b.awayScore[1], "SCORE_DOWNWARD_CORRECTION");
+
+    // ⑦ 旧データ(atBatSeqなし)のfromSeq推定：走塁アウト(盗塁死等)がoutsAtAbに含まれず継投境界がズレる
+    var p7 = computePitcherStats({innings:1, finished:false, awayPitcherIdx:0, homePitcherIdx:1,
+      awayPitchers:[{name:"敵投手"}], homePitchers:[{name:"H_A"},{name:"H_B"}],
+      awayPitcherLog:basePLog("bottom"),
+      homePitcherLog:[{pitcherIdx:0,fromInning:1,fromHalf:"top",outsAtStart:0},{pitcherIdx:1,fromInning:1,fromHalf:"top",outsAtStart:2}],
+      awayLineup:[mkP("b1",{1:[{code:"GO"}]}),mkP("b2",{1:[{code:"K"}]}),mkP("b3",{1:[{code:"FO"}]})],
+      homeLineup:[mkP("h1",{1:[]})],
+      baserunnerOuts:[{inning:1,half:"top",outsAtTime:1,defTeam:"home",pitcherIdx:0}]});
+    T("[既知#7]投手:旧データで走塁アウトが継投境界に反映", p7.home[0]._outsGot===2&&p7.home[1]._outsGot===2, "A="+p7.home[0]._outsGot+" B="+p7.home[1]._outsGot, "LEGACY_FROMSEQ_BASERUNNER_OUT");
+  } catch(err) {
+    T("実行エラーなし", false, err&&err.message);
+  }
+  return results;
+};
+// 🧪 SELF TEST END
 
 const newGame = (innings=7, pitchMode="result", season=null, tournament=null) => ({
   id:Date.now(),
@@ -2785,6 +2910,13 @@ function App() {
         }
       }
 
+      // v473.38: 走塁による得点（本盗・WP・PB・BK等）を投手の失点として記録
+      // atBatsのrunsに含まれないため、これがないと失点(autoRuns)から漏れる
+      let brRuns = Array.isArray(g.baserunnerRuns) ? [...g.baserunnerRuns] : (g.baserunnerRuns ? Object.values(g.baserunnerRuns) : []);
+      if(scoreAdd > 0) {
+        brRuns.push({inning:g.inning, half:g.half, defTeam:brDefTeam, pitcherIdx:brPitcherIdx, runs:scoreAdd});
+      }
+
       return {...g,
         [lk]:lineup,
         [scoreKey]:newScore,
@@ -2793,6 +2925,7 @@ function App() {
         inning:changeOccurs?(g.half==="top"?g.inning:Math.min(g.inning+1,15)):g.inning,
         half:changeOccurs?(g.half==="top"?"bottom":"top"):g.half,
         baserunnerOuts:brOuts,
+        baserunnerRuns:brRuns,
         log};
     });
     // チェンジになった場合のみストライク・ボールカウントをリセット（球数は保持）
@@ -3622,8 +3755,11 @@ function App() {
       } else { _histWithCur=_hist; }
     } else { _histWithCur=_hist; }
     var allG=_histWithCur.filter(function(g){return g&&g.awayLineup&&g.homeLineup&&g.finished;});
+    // v473.39: 年別バケット対応。戻り値は {all:{投手名:成績}, "2026":{投手名:成績}, ...} 構造
+    var _seasonOfP=function(g){return String(g.season||(g.date?new Date(g.date).getFullYear():new Date().getFullYear()));};
+    var _buildPit=function(_games){
     var map={};
-    allG.forEach(function(fg){
+    _games.forEach(function(fg){
       ["away","home"].forEach(function(side){
         if(fg[side+"Team"]!==myTeam.name) return;
         var pits=fg[side+"Pitchers"]||[];
@@ -3667,6 +3803,15 @@ function App() {
       result[name]={g:m.games.size,w:m.w,l:m.l,s:m.s,ip:ipStr,er:m.er,h:m.h,bb:m.bb,k:m.k,hbp:m.hbp,era:era,whip:whip,k9:k9};
     });
     return result;
+    };
+    // 全期間 + 年ごとのバケットを構築
+    var _outP={all:_buildPit(allG)};
+    var _seenP={};
+    allG.forEach(function(g){_seenP[_seasonOfP(g)]=1;});
+    Object.keys(_seenP).forEach(function(y){
+      _outP[y]=_buildPit(allG.filter(function(g){return _seasonOfP(g)===y;}));
+    });
+    return _outP;
   },[myTeam,history,game]);
 
   // シェアカード用：打撃通算成績をメインコンポーネントで計算
@@ -3683,13 +3828,16 @@ function App() {
       } else { _histWithCur=_hist; }
     } else { _histWithCur=_hist; }
     var allG=_histWithCur.filter(function(g){return g&&g.awayLineup&&g.homeLineup&&g.finished;});
+    // v473.39: 年別バケット対応。戻り値は {all:{選手名:成績}, "2026":{選手名:成績}, ...} 構造
+    var _seasonOf=function(g){return String(g.season||(g.date?new Date(g.date).getFullYear():new Date().getFullYear()));};
+    var _buildBat=function(_games){
     var map={};
-    allG.forEach(function(fg){
+    _games.forEach(function(fg){
       ["away","home"].forEach(function(side){
         if(fg[side+"Team"]!==myTeam.name) return;
         var lu=fg[side+"Lineup"]||[];
         lu.forEach(function(p){
-          var allV=[p].concat(p._subOuts||[]);
+          var allV=[p].concat(p._subOuts||[]).concat((p._subOut&&!p._subOuts)?[p._subOut]:[]); // v473.39: 旧形式_subOutも含める(成績タブと統一)
           allV.forEach(function(v){
             if(!v||!v.name||v.name.startsWith("選手")) return;
             if(!map[v.name]) map[v.name]={pa:0,ab:0,h:0,h2:0,h3:0,hr:0,rbi:0,bb:0,hbp:0,k:0,sb:0,sac:0,sf:0,ci:0,games:new Set()};
@@ -3702,11 +3850,11 @@ function App() {
                 if(!ab||!ab.code) return;
                 var c=ab.code;
                 m.pa++;
-                if(["BB","IBB","HBP","KW","CI","SAC","SF"].indexOf(c)<0) m.ab++;
+                if(["BB","IBB","HBP","CI","SAC","SF"].indexOf(c)<0) m.ab++; // v473.38: KWは打数に含む(公式ルール・computeOneStatsと統一)
                 if(["H1","H2","H3","HR"].indexOf(c)>=0){m.h++;if(c==="H2")m.h2++;if(c==="H3")m.h3++;if(c==="HR")m.hr++;}
                 if(["BB","IBB"].indexOf(c)>=0) m.bb++;
                 if(c==="HBP") m.hbp++;
-                if(["K","KL"].indexOf(c)>=0) m.k++;
+                if(["K","KL","KW"].indexOf(c)>=0) m.k++; // v473.38: KWも三振(computeOneStatsと統一)
                 if(c==="SAC") m.sac++;
                 if(c==="SF") m.sf++;
                 if(c==="CI") m.ci++;
@@ -3728,6 +3876,15 @@ function App() {
       result[name]={g:m.games.size,pa:m.pa,ab:m.ab,h:m.h,hr:m.hr,rbi:m.rbi,bb:m.bb,k:m.k,sb:m.sb,avg:avg,slg:slg,obp:obp,ops:ops};
     });
     return result;
+    };
+    // 全期間 + 年ごとのバケットを構築
+    var _out={all:_buildBat(allG)};
+    var _seen={};
+    allG.forEach(function(g){_seen[_seasonOf(g)]=1;});
+    Object.keys(_seen).forEach(function(y){
+      _out[y]=_buildBat(allG.filter(function(g){return _seasonOf(g)===y;}));
+    });
+    return _out;
   },[myTeam,history,game]);
 
   const curTeam   = game.half==="top"?"away":"home";
@@ -4133,7 +4290,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.37")
+        , React.createElement('div',{onClick:function(){var pw=window.prompt("");if(pw!==DEV_PASS)return;var r=OWAPRO_SELF_TEST();var realFail=r.filter(function(x){return !x.pass&&!x.knownBugId;});var known=r.filter(function(x){return !x.pass&&x.knownBugId;});var fixed=r.filter(function(x){return x.pass&&x.knownBugId;});var msg="🧪 自己診断 "+r.length+"件\n";msg+=realFail.length===0?"✅ 想定外の不合格なし\n":"❌ 想定外の不合格 "+realFail.length+"件\n"+realFail.map(function(x){return "・"+x.name+"("+x.detail+")";}).join("\n")+"\n";if(known.length>0)msg+="⚠️ 既知未修正 "+known.length+"件\n"+known.map(function(x){return "・"+x.name;}).join("\n")+"\n";if(fixed.length>0)msg+="🎉 既知バグが直っています！knownBugIdを外してテストを確定してください: "+fixed.map(function(x){return x.name;}).join(",");alert(msg);},style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.42")
         
       )
 
@@ -4216,7 +4373,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.37")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.42")
         )
 
         // ===== 新規チーム作成 =====
@@ -4458,7 +4615,8 @@ function App() {
                     "📸 シェアモード搭載！SNS用スコアボードカードが作成できます！",
                     "UIを全面リニューアル・タブを画面上部に固定・ホーム画面のボタンを整理",
                     "LA Lightカラーテーマ（ダーク切り替え可能）",
-                    "打者0バグ修正・ランナー表記順修正"
+                    "打者0バグ修正・ランナー表記順修正・投手成績の計算精度を改善（サヨナラ時の投球回・本盗等の失点）",
+                    "成績タブ・シェアカードに年選択機能を追加（両者の数字のズレを解消）"
                   ]},
                   {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
                   {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
@@ -5860,7 +6018,8 @@ function App() {
                     "📸 シェアモード搭載！SNS用スコアボードカードが作成できます！",
                     "UIを全面リニューアル・タブを画面上部に固定・ホーム画面のボタンを整理",
                     "LA Lightカラーテーマ（ダーク切り替え可能）",
-                    "打者0バグ修正・ランナー表記順修正"
+                    "打者0バグ修正・ランナー表記順修正・投手成績の計算精度を改善（サヨナラ時の投球回・本盗等の失点）",
+                    "成績タブ・シェアカードに年選択機能を追加（両者の数字のズレを解消）"
                   ]},
                   {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
                   {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
@@ -8041,6 +8200,9 @@ function ShareCardModal(props) {
   var mode = modeState[0]; var setMode = modeState[1];
   var cardTypeState = useState("B");
   var cardType = cardTypeState[0]; var setCardType = cardTypeState[1];
+  // v473.39: シェアカードの集計期間（"all"=全期間 / "2026"等=年単位）
+  var shareSeasonState = useState("all");
+  var shareSeason = shareSeasonState[0]; var setShareSeason = shareSeasonState[1];
   var stampState = useState("VICTORY");
   var stamp = stampState[0]; var setStamp = stampState[1];
   var selPlayerState = useState(null);
@@ -8096,14 +8258,21 @@ function ShareCardModal(props) {
     myTeam.members.forEach(function(m){ playerList.push(typeof m==="string"?{name:m,pos:""}:m); });
   }
 
-  // 通算打撃成績（StatsTabの計算結果を優先使用）
+  // 通算打撃成績（親コンポーネントの年別バケットを参照）
   var allGames = history.filter(function(g){return g&&g.awayLineup&&g.homeLineup&&g.finished;});
+  // v473.39: 年選択用シーズン一覧（新しい年が先頭）
+  var shareSeasonYears = [];
+  allGames.forEach(function(g){
+    var _y = String(g.season||(g.date?new Date(g.date).getFullYear():new Date().getFullYear()));
+    if(shareSeasonYears.indexOf(_y)<0) shareSeasonYears.push(_y);
+  });
+  shareSeasonYears.sort(); shareSeasonYears.reverse();
   var playerStats = null;
   if(selPlayer && mode==="player_bat") {
-    // StatsTabが計算済みならwindow.__shareBatMapを優先、なければshareBattingMapを使用
-    var _batMapW = window.__shareBatMap || null;
-    var _batRawW = _batMapW ? _batMapW[selPlayer.name] : null;
-    var _batRaw = _batRawW || shareBattingMap[selPlayer.name] || null;
+    // v473.39: 年別バケット構造のshareBattingMapを参照（成績タブを開いたか否かで
+    // 数字が変わる原因だったwindow.__shareBatMap優先は廃止し、常に同一の計算結果を使用）
+    var _batBucket = ((shareBattingMap||{})[shareSeason]) || ((shareBattingMap||{}).all) || {};
+    var _batRaw = _batBucket[selPlayer.name] || null;
     if(_batRaw) {
       // StatsTabのaggregatePlayerStats形式（_avg等）とshareBattingMap形式（avg等）両対応
       var _avg = _batRaw._avg || _batRaw.avg || ".000";
@@ -8128,10 +8297,9 @@ function ShareCardModal(props) {
   // 投手成績集計（メインコンポーネントで計算済みのsharePitcherMapを使用）
   var pitStats = null;
   if(selPlayer && mode==="player_pit") {
-    // StatsTabが計算済みならwindow.__sharePitMapを優先、なければsharePitcherMapを使用
-    var _pitMapW = window.__sharePitMap || null;
-    var _rawW = _pitMapW ? _pitMapW[selPlayer.name] : null;
-    var _raw = _rawW || sharePitcherMap[selPlayer.name] || null;
+    // v473.39: 年別バケット構造のsharePitcherMapを参照（window.__sharePitMap優先は廃止）
+    var _pitBucket = ((sharePitcherMap||{})[shareSeason]) || ((sharePitcherMap||{}).all) || {};
+    var _raw = _pitBucket[selPlayer.name] || null;
     if(_raw) {
       // StatsTabのawayPit形式（ipDisp, era等あり）と
       // sharePitcherMap形式（ip, era等あり）の両方に対応
@@ -8462,7 +8630,7 @@ function ShareCardModal(props) {
     return React.createElement("div",{ref:cardRef,style:Object.assign({},sCard,{
       background:T.cardBg})}
       ,React.createElement("div",{style:{background:T.bannerBg,padding:"3px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}
-        ,React.createElement("div",{style:{fontFamily:"'Oswald',sans-serif",fontSize:8,fontWeight:700,color:T.bannerTxt,letterSpacing:2}},"⚾ SEASON STATS")
+        ,React.createElement("div",{style:{fontFamily:"'Oswald',sans-serif",fontSize:8,fontWeight:700,color:T.bannerTxt,letterSpacing:2}},"⚾ "+(shareSeason==="all"?"CAREER STATS":shareSeason+" SEASON"))
         ,React.createElement("div",{style:{fontFamily:"'Noto Sans JP',sans-serif",fontSize:7,fontWeight:900,color:"#fff",background:"rgba(0,0,0,0.35)",padding:"1px 4px",borderRadius:2}},"簡単！みんなの野球記録")
       )
       ,React.createElement("div",{style:{display:"flex",height:noPhoto?100:138,position:"relative",zIndex:2}}
@@ -8689,6 +8857,17 @@ function ShareCardModal(props) {
       )
     )
     ,(mode==="player_bat"||mode==="player_pit")&&React.createElement(React.Fragment,null
+      ,React.createElement("div",{style:{width:"100%",maxWidth:380,marginBottom:8}}
+        ,React.createElement("div",{style:{fontSize:10,color:"#74897b",marginBottom:6}},"集計期間")
+        ,React.createElement("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}}
+          ,[["all","全期間"]].concat(shareSeasonYears.map(function(y){return [y,y+"年"];})).map(function(opt){
+            return React.createElement("button",{key:opt[0],onClick:function(){setShareSeason(opt[0]);},
+              style:{padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",fontSize:11,fontWeight:700,
+                background:shareSeason===opt[0]?"#c8a400":"#0c160e",
+                color:shareSeason===opt[0]?"#000":(appTheme==="light"?"#334":"#9fb3a5")}},opt[1]);
+          })
+        )
+      )
       ,React.createElement("div",{style:{width:"100%",maxWidth:380,marginBottom:8}}
         ,React.createElement("div",{style:{fontSize:10,color:"#74897b",marginBottom:6}},"選手を選ぶ")
         ,React.createElement("div",{style:{display:"flex",gap:4,flexWrap:"wrap"}}
@@ -8962,6 +9141,9 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
     const db = b.date||"";
     return da<db?1:da>db?-1:0;
   });
+
+  // v473.39: 年選択用のシーズン一覧（新しい年が先頭）
+  const seasonYears = [...new Set(allGames.map(g=>g.season||(g.date?new Date(g.date).getFullYear():new Date().getFullYear())))].sort((a,b)=>b-a);
 
   // 選択中チーム・シーズン・大会でフィルタした試合
   const filteredGames = allGames.filter(g=>{
@@ -9716,6 +9898,29 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             }, "📊 Excel出力")
         )
 
+      // シーズン（年）フィルター v473.39
+      , seasonYears.length > 0 && React.createElement('div', {style:{marginBottom:12}}
+        , React.createElement('div', {style:{fontSize:11,color:"#c084fc",marginBottom:6,fontWeight:700}}, "📅 シーズン")
+        , React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap"}}
+          , React.createElement('button', {key:"allseason",
+              onClick:()=>setSelectedSeason(null),
+              style:{padding:"5px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
+                background:selectedSeason===null?"#4c1d95":"#122016",
+                border:`1.5px solid ${selectedSeason===null?"#c084fc":"#24402b"}`,
+                color:selectedSeason===null?"#e9d5ff":"#74897b"}
+            }, "全期間")
+          , seasonYears.map(y=>
+              React.createElement('button', {key:"season"+y,
+                onClick:()=>setSelectedSeason(y),
+                style:{padding:"5px 12px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,
+                  background:selectedSeason===y?"#4c1d95":"#122016",
+                  border:`1.5px solid ${selectedSeason===y?"#c084fc":"#24402b"}`,
+                  color:selectedSeason===y?"#e9d5ff":"#74897b"}
+              }, y+"年")
+          )
+        )
+      )
+
       // 大会フィルター
       , (tournaments||[]).length > 0 && React.createElement('div', {style:{marginBottom:12}}
         , React.createElement('div', {style:{fontSize:11,color:"#e09600",marginBottom:6,fontWeight:700}}, "🏆 大会")
@@ -9757,7 +9962,7 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
             })
         )
         , React.createElement('div', {style:{fontSize:10,color:"#4b6052",marginTop:4}},
-            filteredGames.length+"試合分の成績"+(selectedTeam?" ("+selectedTeam+")":"")+(selectedSeason?" "+selectedSeason+"年":""))
+            filteredGames.length+"試合分の成績"+(selectedTeam?" ("+selectedTeam+")":"")+(selectedSeason?" "+selectedSeason+"年":" 全期間"))
       )
 
       // チーム未選択メッセージ
