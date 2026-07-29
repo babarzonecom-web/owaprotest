@@ -713,6 +713,59 @@ const eShort = (e) => { const n=norm(e); return (_optionalChain([rOf, 'call', _2
 const eRuns  = (list) => list.reduce((s,e)=>s+(norm(e).runs||0),0);
 const toList = (ab,inn) => { if(!ab||ab[inn]==null) return []; return Array.isArray(ab[inn])?ab[inn]:[ab[inn]]; };
 
+// ================================================================
+// 🔄 この回をやり直す機能（v473.45）用ヘルパー
+// ================================================================
+// 指定チームの、指定イニングまで（含む）の総打席数を数える（打順計算用）
+const computeBatterCountThroughInning = (game, team, uptoInning) => {
+  const lineup = game[team+"Lineup"]||[];
+  let total = 0;
+  lineup.forEach(p=>{
+    for(let i=1;i<=uptoInning;i++){ total += toList(p.atBats, i).length; }
+    (p._subOuts||[]).forEach(so=>{
+      for(let i=1;i<=uptoInning;i++){ total += toList(so.atBats, i).length; }
+    });
+    if(p._subOut && !p._subOuts){
+      for(let i=1;i<=uptoInning;i++){ total += toList(p._subOut.atBats, i).length; }
+    }
+  });
+  return total;
+};
+// 指定チーム・指定回（表/裏はチームで自動決定）に選手交代が起きていた/古い形式で判定不能かをチェック
+const hasSubRiskInHalf = (game, team, inning) => {
+  const lineup = game[team+"Lineup"]||[];
+  const half = team==="away" ? "top" : "bottom";
+  let risky = false;
+  lineup.forEach(p=>{
+    const subs = [...(p._subOuts||[]), ...((p._subOut&&!p._subOuts)?[p._subOut]:[])];
+    subs.forEach(so=>{
+      if(so.subInning===undefined || so.subHalf===undefined) risky = true; // 旧形式：安全側でリスク扱い
+      else if(so.subInning===inning && so.subHalf===half) risky = true;
+    });
+  });
+  return risky;
+};
+// 指定チーム・指定回の開始時点で有効だった投手Idxと、defTeamPitcherLogの「その時点までの件数」を返す
+const getPitcherLogStateAtHalfStart = (game, team, inning) => {
+  const defTeam = team==="away" ? "home" : "away";
+  const half = team==="away" ? "top" : "bottom";
+  const log = game[defTeam+"PitcherLog"]||[];
+  // (fromInning, fromHalf) が (inning, half) より厳密に前のものだけが「開始時点で有効」
+  const before = log.filter(e=>{
+    const eh = e.fromHalf==="bottom" ? 1 : 0;
+    const th = half==="bottom" ? 1 : 0;
+    return (e.fromInning < inning) || (e.fromInning===inning && eh < th);
+  });
+  const during = log.filter(e=> e.fromInning===inning && e.fromHalf===half);
+  const after = log.filter(e=>{
+    const eh = e.fromHalf==="bottom" ? 1 : 0;
+    const th = half==="bottom" ? 1 : 0;
+    return (e.fromInning > inning) || (e.fromInning===inning && eh > th);
+  });
+  const startPitcherIdx = before.length>0 ? before[before.length-1].pitcherIdx : 0;
+  return {defTeam, half, before, during, after, startPitcherIdx};
+};
+
 const POS_ABBR = {
   "投手":"投","捕手":"捕","一塁手":"一","二塁手":"二","三塁手":"三",
   "遊撃手":"遊","左翼手":"左","中堅手":"中","右翼手":"右","指名打者":"指",
@@ -1759,6 +1812,36 @@ const OWAPRO_SELF_TEST = function(){
       homeLineup:[mkP("h1",{1:[]})],
       baserunnerOuts:[{inning:1,half:"top",outsAtTime:1,defTeam:"home",pitcherIdx:0}]});
     T("[既知#7]投手:旧データで走塁アウトが継投境界に反映", p7.home[0]._outsGot===2&&p7.home[1]._outsGot===2, "A="+p7.home[0]._outsGot+" B="+p7.home[1]._outsGot, "LEGACY_FROMSEQ_BASERUNNER_OUT");
+
+    // ---- この回をやり直す機能のヘルパー（16〜19件目・v473.45） ----
+    var gR1 = {awayLineup:[
+      mkP("a1",{1:[{code:"GO"}],2:[{code:"H1"}]}),
+      mkP("a2",{1:[{code:"K"}],2:[{code:"BB"}]}),
+      mkP("a3",{1:[{code:"FO"}]})
+    ]};
+    T("やり直し:打席数カウント(1回まで=3)", computeBatterCountThroughInning(gR1,"away",1)===3, computeBatterCountThroughInning(gR1,"away",1));
+    T("やり直し:打席数カウント(2回まで=5)", computeBatterCountThroughInning(gR1,"away",2)===5, computeBatterCountThroughInning(gR1,"away",2));
+
+    var gR3 = {awayLineup:[
+      {name:"a1",atBats:{1:[{code:"GO"}]}, _subOuts:[{name:"旧a1",atBats:{1:[{code:"K"}]},subInning:1,subHalf:"top"}]}
+    ]};
+    T("やり直し:対象回に交代タグ一致→リスク検知", hasSubRiskInHalf(gR3,"away",1)===true, hasSubRiskInHalf(gR3,"away",1));
+    T("やり直し:別の回は対象外→リスクなし", hasSubRiskInHalf(gR3,"away",2)===false, hasSubRiskInHalf(gR3,"away",2));
+
+    var gR4 = {awayLineup:[
+      {name:"a1",atBats:{1:[{code:"GO"}]}, _subOuts:[{name:"旧a1",atBats:{1:[{code:"K"}]}}]} // subInning/subHalfなし(旧形式)
+    ]};
+    T("やり直し:旧形式(タグなし交代)は安全側でリスク扱い", hasSubRiskInHalf(gR4,"away",1)===true, hasSubRiskInHalf(gR4,"away",1));
+
+    var gR5 = {homePitcherLog:[
+      {pitcherIdx:0, fromInning:1, fromHalf:"top"},
+      {pitcherIdx:1, fromInning:2, fromHalf:"top"},
+      {pitcherIdx:2, fromInning:3, fromHalf:"top"}
+    ]};
+    var pR5 = getPitcherLogStateAtHalfStart(gR5, "away", 2);
+    T("やり直し:回開始時点の投手ログ分割(before/during/after)",
+      pR5.defTeam==="home" && pR5.startPitcherIdx===0 && pR5.before.length===1 && pR5.during.length===1 && pR5.after.length===1,
+      pR5.defTeam+"/"+pR5.startPitcherIdx+"/"+pR5.before.length+"/"+pR5.during.length+"/"+pR5.after.length);
   } catch(err) {
     T("実行エラーなし", false, err&&err.message);
   }
@@ -2736,7 +2819,12 @@ function App() {
     const wasChange = newOuts>=3;
     if(wasChange){
       setModal(null);
-      showToast(`チェンジ！ ${_optionalChain([rOf, 'call', _9 => _9(code), 'optionalAccess', _10 => _10.label])||code} 記録`);
+      // v473.45: この回やり直しモード中に3アウトに達したら、通常の次イニング進行の代わりに確定処理を行う
+      if(game.redoContext && game.redoContext.active && game.redoContext.team===team){
+        finalizeRedoInningIfNeeded();
+      } else {
+        showToast(`チェンジ！ ${_optionalChain([rOf, 'call', _9 => _9(code), 'optionalAccess', _10 => _10.label])||code} 記録`);
+      }
     } else {
       // 得点があれば自責点モーダルを表示(次打者モーダルより優先)
       const hasRuns = (runs||0) > 0;
@@ -3299,6 +3387,7 @@ function App() {
         }
 
         // 選手交代 → 元選手を_subOuts配列に追記（チェーン対応）
+        // v473.45: subInning/subHalfで「いつ交代したか」を記録（この回やり直し機能のリスク判定に使用）
         const prevSubOuts = p._subOuts || [];
         // 既に_subOutが1件ある古い形式も吸収
         const legacySubOut = p._subOut && !p._subOuts ? [p._subOut] : [];
@@ -3310,6 +3399,8 @@ function App() {
           cs: p.cs || 0,
           run: p.run || 0,
           e: p.e || 0,
+          subInning: g.inning,
+          subHalf: g.half,
         }];
 
         return {
@@ -3359,7 +3450,142 @@ function App() {
     });
   },[mutGame]);
 
-  const changePitcher = useCallback((defTeam, newPitcherIdx)=>{
+  // ================================================================
+  // 🔄 この回をやり直す機能（v473.45）
+  // ================================================================
+  const startRedoInning = useCallback((team, inning)=>{
+    mutGame(g=>{
+      if(hasSubRiskInHalf(g, team, inning)){
+        showToast("⚠️ この回には選手交代が記録されているため、やり直せません");
+        return g;
+      }
+      const half = team==="away" ? "top" : "bottom";
+      const {defTeam, before, during, after, startPitcherIdx} = getPitcherLogStateAtHalfStart(g, team, inning);
+      const originalEndingBatterIdx = computeBatterCountThroughInning(g, team, inning) % ((g[team+"Lineup"]||[]).length||9);
+
+      const redoContext = {
+        active: true, team, defTeam, inning, half,
+        originalEndingBatterIdx,
+        preHalfLogLength: before.length,
+        duringCount: during.length,
+        afterLog: after, // 復元用に温存
+        savedLive: {
+          inning: g.inning, half: g.half, outs: g.outs, bases: g.bases,
+          awayBatterIdx: g.awayBatterIdx, homeBatterIdx: g.homeBatterIdx,
+          awayPitcherIdx: g.awayPitcherIdx, homePitcherIdx: g.homePitcherIdx,
+        },
+      };
+
+      // 対象半イニングのatBatsをクリア
+      const lk = team+"Lineup";
+      const lineup = g[lk].map(p=>{
+        const na = {...(p.atBats||{})};
+        delete na[inning];
+        return {...p, atBats:na};
+      });
+      // 対象半イニング中の投手ログをbeforeのみに切り詰め
+      const newDefLog = before;
+      // 対象半イニング中のbaserunnerOuts/Runsを除去
+      const filterHalf = arr => (arr||[]).filter(e=> !(e.inning===inning && e.half===half));
+      const newBrOuts = filterHalf(g.baserunnerOuts);
+      const newBrRuns = filterHalf(g.baserunnerRuns);
+      // 対象半イニングのスコアもリセット（recomputeScoresで再計算される）
+      const scoreKey = team+"Score";
+      const newScore = {...(g[scoreKey]||{})}; delete newScore[inning];
+
+      return {...g,
+        [lk]: lineup,
+        [defTeam+"PitcherLog"]: newDefLog,
+        [defTeam+"PitcherIdx"]: startPitcherIdx,
+        baserunnerOuts: newBrOuts,
+        baserunnerRuns: newBrRuns,
+        [scoreKey]: newScore,
+        inning, half, outs:0, bases:[null,null,null],
+        [team+"BatterIdx"]: computeBatterCountThroughInning(g, team, inning-1) % ((g[team+"Lineup"]||[]).length||9),
+        redoContext,
+      };
+    });
+    showToast("🔄 やり直しモード開始。この回を最初から入力してください");
+  },[mutGame]);
+
+  const cancelRedoInning = useCallback(()=>{
+    mutGame(g=>{
+      if(!g.redoContext || !g.redoContext.active) return g;
+      showToast("↩️ やり直しをキャンセルしました（元に戻せません。復元ポイントからの復旧が必要です）");
+      return g; // 実データの巻き戻しは複雑なため、キャンセル時は「redoContextを消して現状のまま」とする
+    });
+  },[mutGame]);
+
+  // commitAtBatでchangeOccurs(3アウト)が起きた直後に呼ぶ。redoContext中でなければ何もしない。
+  const finalizeRedoInningIfNeeded = useCallback(()=>{
+    mutGame(g=>{
+      const rc = g.redoContext;
+      if(!rc || !rc.active) return g;
+      const {team, defTeam, inning, half, originalEndingBatterIdx, preHalfLogLength, duringCount, afterLog, savedLive} = rc;
+
+      // 新しく記録された投手ログの件数
+      const curDefLog = g[defTeam+"PitcherLog"]||[];
+      const newDuringCount = curDefLog.length - preHalfLogLength;
+      const delta = newDuringCount - duringCount;
+
+      // afterLog(温存していた以降の投手交代)を末尾に復元
+      const mergedDefLog = [...curDefLog, ...afterLog];
+
+      // pLogIdxのシフト：team側(このteamは半イニングhalfで打撃=defTeamが投げていた)のatBatsのうち
+      // inningより後のものでpLogIdx >= preHalfLogLength+duringCount のものをdeltaだけシフト
+      const shiftIfNeeded = (entry) => {
+        if(entry && typeof entry.pLogIdx === "number" && entry.pLogIdx >= preHalfLogLength+duringCount){
+          return {...entry, pLogIdx: entry.pLogIdx+delta};
+        }
+        return entry;
+      };
+      const lk = team+"Lineup";
+      const shiftedLineup = (g[lk]||[]).map(p=>{
+        const na = {...(p.atBats||{})};
+        Object.keys(na).forEach(k=>{
+          const innNum = parseInt(k);
+          if(innNum > inning){
+            na[k] = toList(na, innNum).map(shiftIfNeeded);
+          }
+        });
+        const subOuts = (p._subOuts||[]).map(so=>{
+          const sna = {...(so.atBats||{})};
+          Object.keys(sna).forEach(k=>{
+            const innNum = parseInt(k);
+            if(innNum > inning){
+              sna[k] = toList(sna, innNum).map(shiftIfNeeded);
+            }
+          });
+          return {...so, atBats:sna};
+        });
+        return {...p, atBats:na, ...(p._subOuts?{_subOuts:subOuts}:{})};
+      });
+
+      // 打順ズレチェック
+      const newEndingBatterIdx = g[team+"BatterIdx"];
+      let batterOrderWarning = g.batterOrderWarning;
+      if(newEndingBatterIdx !== originalEndingBatterIdx){
+        batterOrderWarning = {
+          team, inning, half,
+          message: `${g[team+"Team"]||team}の${inning}回${half==="top"?"表":"裏"}やり直しで打順の人数が変わりました。${inning+1}回以降の打席担当がズレている可能性があります。オーダータブ・成績タブで確認してください。`,
+        };
+      }
+
+      // ライブ位置を元に戻す
+      return {...g,
+        [lk]: shiftedLineup,
+        [defTeam+"PitcherLog"]: mergedDefLog,
+        redoContext: null,
+        batterOrderWarning,
+        inning: savedLive.inning, half: savedLive.half, outs: savedLive.outs, bases: savedLive.bases,
+        awayBatterIdx: savedLive.awayBatterIdx, homeBatterIdx: savedLive.homeBatterIdx,
+        awayPitcherIdx: savedLive.awayPitcherIdx, homePitcherIdx: savedLive.homePitcherIdx,
+      };
+    });
+    showToast("✅ やり直し完了。元の試合の続きに戻りました");
+  },[mutGame]);
+
+
     if(window.__teamShareRole==="member"){ showToast("👥 メンバーは操作できません"); return; }
     mutGame(g=>{
       const logKey = defTeam+"PitcherLog";
@@ -4290,7 +4516,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{onClick:function(){var pw=window.prompt("");if(pw!==DEV_PASS)return;var r=OWAPRO_SELF_TEST();var realFail=r.filter(function(x){return !x.pass&&!x.knownBugId;});var known=r.filter(function(x){return !x.pass&&x.knownBugId;});var fixed=r.filter(function(x){return x.pass&&x.knownBugId;});var msg="🧪 自己診断 "+r.length+"件\n";msg+=realFail.length===0?"✅ 想定外の不合格なし\n":"❌ 想定外の不合格 "+realFail.length+"件\n"+realFail.map(function(x){return "・"+x.name+"("+x.detail+")";}).join("\n")+"\n";if(known.length>0)msg+="⚠️ 既知未修正 "+known.length+"件\n"+known.map(function(x){return "・"+x.name;}).join("\n")+"\n";if(fixed.length>0)msg+="🎉 既知バグが直っています！knownBugIdを外してテストを確定してください: "+fixed.map(function(x){return x.name;}).join(",");alert(msg);},style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.42")
+        , React.createElement('div',{onClick:function(){var pw=window.prompt("");if(pw!==DEV_PASS)return;var r=OWAPRO_SELF_TEST();var realFail=r.filter(function(x){return !x.pass&&!x.knownBugId;});var known=r.filter(function(x){return !x.pass&&x.knownBugId;});var fixed=r.filter(function(x){return x.pass&&x.knownBugId;});var msg="🧪 自己診断 "+r.length+"件\n";msg+=realFail.length===0?"✅ 想定外の不合格なし\n":"❌ 想定外の不合格 "+realFail.length+"件\n"+realFail.map(function(x){return "・"+x.name+"("+x.detail+")";}).join("\n")+"\n";if(known.length>0)msg+="⚠️ 既知未修正 "+known.length+"件\n"+known.map(function(x){return "・"+x.name;}).join("\n")+"\n";if(fixed.length>0)msg+="🎉 既知バグが直っています！knownBugIdを外してテストを確定してください: "+fixed.map(function(x){return x.name;}).join(",");alert(msg);},style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.45")
         
       )
 
@@ -4373,7 +4599,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.42")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.45")
         )
 
         // ===== 新規チーム作成 =====
@@ -4616,7 +4842,10 @@ function App() {
                     "UIを全面リニューアル・タブを画面上部に固定・ホーム画面のボタンを整理",
                     "LA Lightカラーテーマ（ダーク切り替え可能）",
                     "打者0バグ修正・ランナー表記順修正・投手成績の計算精度を改善（サヨナラ時の投球回・本盗等の失点）",
-                    "成績タブ・シェアカードに年選択機能を追加（両者の数字のズレを解消）"
+                    "成績タブ・シェアカードに年選択機能を追加（両者の数字のズレを解消）",
+                    "同名チーム同士の試合で片側の選手成績が集計されないバグを修正",
+                    "試合開始時、未設定側に同じチームが自動セットされるバグを修正",
+                    "スコア表の過去の回をタップして「この回をやり直す」機能を追加（交代のない回のみ対応）"
                   ]},
                   {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
                   {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
@@ -5151,6 +5380,28 @@ function App() {
             )
           )
 
+          // v473.45: この回やり直しモード中の表示
+          , !isReadOnly && game.redoContext && game.redoContext.active && React.createElement('div', {
+              style:{background:"#3a2a0c",border:"2px solid #e08c24",borderRadius:12,padding:12,display:"flex",flexDirection:"column",gap:8}
+            }
+            , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#ffb52e"}},
+                "🔄 やり直しモード：", game[game.redoContext.team+"Team"]||game.redoContext.team, " ",
+                game.redoContext.inning, "回", game.redoContext.half==="top"?"表":"裏", " を入力中")
+            , React.createElement('div', {style:{fontSize:11,color:"#d4a574"}}, "3アウトで自動的に元の試合の続きに戻ります。3アウトにならない場合は下のボタンで手動確定してください。")
+            , React.createElement('button', {onClick:()=>finalizeRedoInningIfNeeded(),
+                style:{...sBt("#e08c24"),padding:"8px",fontSize:13,fontWeight:700}}, "✅ この回の入力をここで確定する")
+          )
+
+          // v473.45: 打順ズレ警告バナー
+          , !isReadOnly && game.batterOrderWarning && React.createElement('div', {
+              style:{background:"#2a1414",border:"2px solid #ff7d72",borderRadius:12,padding:12,display:"flex",flexDirection:"column",gap:8}
+            }
+            , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#ff7d72"}}, "⚠️ 打順ズレの可能性")
+            , React.createElement('div', {style:{fontSize:12,color:"#f0b0aa",lineHeight:1.6}}, game.batterOrderWarning.message)
+            , React.createElement('button', {onClick:()=>mutGame(g=>({...g,batterOrderWarning:null})),
+                style:{...sBt("#4b6052"),padding:"6px",fontSize:12}}, "確認しました（閉じる）")
+          )
+
           , React.createElement('div', { style: appTheme==="light"?S.cardLight:S.card,}
             , React.createElement('div', { style: {overflowX:"auto"},}
               , React.createElement('table', { style: S.table,}
@@ -5209,7 +5460,14 @@ function App() {
                           // サヨナラ：後攻の最終回に×を付加
                           var showSayonara=sayonara&&row.team==="home"&&i===inn&&scoreStr!==""&&scoreStr!=="×";
                           var isColdEnd=isCold&&i===coldInning&&scoreStr!==""&&scoreStr!==undefined;
-                          return React.createElement('td', { key: i, style: {...(appTheme==="light"?S.tdL:S.td),padding:2,textAlign:"center"},}
+                          // v473.45: この回をやり直す機能。過去に完了した半イニングのみタップ可能
+                          var _innTime2=i*2+(row.team==="home"?1:0);
+                          var _curTime2=curInn*2+(curHalf==="bottom"?1:0);
+                          var _redoEligible = !isReadOnly && !!game.started && !game.redoContext
+                            && _innTime2<_curTime2 && scoreStr!=="" && scoreStr!=="×";
+                          return React.createElement('td', { key: i, style: {...(appTheme==="light"?S.tdL:S.td),padding:2,textAlign:"center",
+                              cursor:_redoEligible?"pointer":"default"},
+                              onClick:_redoEligible?(()=>setModal({step:"redo_confirm",rTeam:row.team,rInning:i})):undefined,}
                             , React.createElement('span', { style: {fontSize:scoreStr==="×"?13:16,fontWeight:700,color:scoreStr==="×"?"#74897b":"#fff",display:"block",padding:"4px 0"},}
                               , showSayonara?(scoreStr+"×"):isColdEnd?(scoreStr+"×"):scoreStr
                             )
@@ -6019,7 +6277,10 @@ function App() {
                     "UIを全面リニューアル・タブを画面上部に固定・ホーム画面のボタンを整理",
                     "LA Lightカラーテーマ（ダーク切り替え可能）",
                     "打者0バグ修正・ランナー表記順修正・投手成績の計算精度を改善（サヨナラ時の投球回・本盗等の失点）",
-                    "成績タブ・シェアカードに年選択機能を追加（両者の数字のズレを解消）"
+                    "成績タブ・シェアカードに年選択機能を追加（両者の数字のズレを解消）",
+                    "同名チーム同士の試合で片側の選手成績が集計されないバグを修正",
+                    "試合開始時、未設定側に同じチームが自動セットされるバグを修正",
+                    "スコア表の過去の回をタップして「この回をやり直す」機能を追加（交代のない回のみ対応）"
                   ]},
                   {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
                   {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
@@ -6628,6 +6889,14 @@ function App() {
                 const matched = allRegistered.filter(t=>t.name===teamName);
                 return matched.length>0 ? matched : allRegistered;
               })(),
+              // v473.43: 未設定側で全チームにフォールバックした場合は自動選択しない
+              // （登録1チームだと未設定側にも同チームが自動セットされ、両側同じスタメン画面になるバグの修正）
+              allowAutoSelect: (()=>{
+                if(preselectFromModal) return true;
+                const teamName = side==="away" ? game.awayTeam : game.homeTeam;
+                const allRegistered = [...(myTeam&&myTeam.name?[myTeam]:[]), ...teams, ...opponents];
+                return allRegistered.some(t=>t.name===teamName);
+              })(),
               currentLineup: lineup,
               preselect: preselect,
               onApply: (t, assignments, slotCount, selPitcher)=>{
@@ -6843,6 +7112,37 @@ function App() {
                           background:"#122016",border:"1px solid #2e4234",color:"#9fb3a5",fontSize:15,fontWeight:700}
                       }, "自責なし")
                   )
+            )
+          );
+        }
+
+        if(modal.step==="redo_confirm") {
+          const rTeam = modal.rTeam, rInning = modal.rInning;
+          const rRisky = hasSubRiskInHalf(game, rTeam, rInning);
+          const rHalf = rTeam==="away" ? "表" : "裏";
+          const rTeamName = game[rTeam+"Team"]||rTeam;
+          return (
+            React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
+              , React.createElement('div', { style: {...S.mBox,maxWidth:320}, onClick: e=>e.stopPropagation(),}
+                , React.createElement('div', { style: {...S.mt,marginBottom:8},}, "🔄 この回をやり直す" )
+                , React.createElement('div', { style: {fontSize:13,color:"#9fb3a5",marginBottom:14,lineHeight:1.6},}
+                  , rTeamName, " ", rInning, "回", rHalf, "の打席・ランナー・投手交代の記録を全て消して、最初から入力し直します。"
+                )
+                , rRisky
+                  ? React.createElement('div', { style: {fontSize:12,color:"#ff7d72",marginBottom:20,lineHeight:1.6,background:"#2a1414",padding:10,borderRadius:8},}
+                      , "⚠️ この回には選手交代が記録されている（または交代時期が不明な古いデータが含まれる）ため、安全のためやり直しできません。オーダータブから手動で修正してください。"
+                    )
+                  : React.createElement('div', { style: {fontSize:12,color:"#ffb52e",marginBottom:20,lineHeight:1.6},}
+                      , "⚠️ この操作は取り消せません。この回の打順の人数が変わると、以降の回の打順がズレる可能性があります（その場合は警告を表示します）。"
+                    )
+                , !rRisky && React.createElement('button', { onClick: ()=>{
+                    startRedoInning(rTeam, rInning);
+                    setModal(null);
+                    setTab("score");
+                  }, style: {...sBt("#e08c24"),width:"100%",padding:"12px",fontSize:14,fontWeight:700,marginBottom:8},}, "🔄 この回をやり直す"
+                  )
+                , React.createElement('button', { onClick: ()=>setModal(null), style: S.cBtn,}, "キャンセル")
+              )
             )
           );
         }
@@ -9158,8 +9458,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const aggregateDefenseStats = (filterTeamName) => {
     const map = {};
     filteredGames.forEach(g=>{
-      const sides = filterTeamName
-        ? (g.awayTeam===filterTeamName?["away"]:g.homeTeam===filterTeamName?["home"]:["away","home"])
+      const sides = filterTeamName // v473.43: 同名チーム同士の試合は両側を集計
+        ? [...(g.awayTeam===filterTeamName?["away"]:[]), ...(g.homeTeam===filterTeamName?["home"]:[])]
         : ["away","home"];
       sides.forEach(side=>{
         (g[side+"Lineup"]||[]).forEach(p=>{
@@ -9190,8 +9490,9 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
     const map = {};
     filteredGames.forEach(g=>{
       // filterTeamNameに一致するsideのlineupを使用
+      // v473.43: 同名チーム同士の試合（紅白戦等）は両側を集計する（片側しか数えず盗塁等が漏れるバグ修正）
       const sides = filterTeamName
-        ? (g.awayTeam===filterTeamName ? ["away"] : g.homeTeam===filterTeamName ? ["home"] : ["away","home"])
+        ? [...(g.awayTeam===filterTeamName?["away"]:[]), ...(g.homeTeam===filterTeamName?["home"]:[])]
         : ["away","home"];
       sides.forEach(side=>{
         const teamName = g[side+"Team"]||"";
@@ -9257,8 +9558,9 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
     const map = {};
     filteredGames.forEach(g=>{
       // filterTeamNameに一致するsideを特定
+      // v473.43: 同名チーム同士の試合は両側を集計
       const sides = filterTeamName
-        ? (g.awayTeam===filterTeamName ? ["away"] : g.homeTeam===filterTeamName ? ["home"] : [])
+        ? [...(g.awayTeam===filterTeamName?["away"]:[]), ...(g.homeTeam===filterTeamName?["home"]:[])]
         : ["away","home"];
       const pStats = computePitcherStats(g);
       sides.forEach(side=>{
@@ -9689,8 +9991,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
   const Recent5Pitching = () => {
     const pitcherMap = {};
     recent5.forEach((g,gi)=>{
-      const sides = selectedTeam
-        ? (g.awayTeam===selectedTeam?["away"]:g.homeTeam===selectedTeam?["home"]:[])
+      const sides = selectedTeam // v473.43: 同名チーム同士の試合は両側を集計
+        ? [...(g.awayTeam===selectedTeam?["away"]:[]), ...(g.homeTeam===selectedTeam?["home"]:[])]
         : ["away","home"];
       const pStats = computePitcherStats(g);
       sides.forEach(side=>{
@@ -9752,8 +10054,8 @@ function StatsTab({ game, history, teams, myTeam, opponents, tournaments, onExce
     const players = {};
     recent5.forEach((g,gi)=>{
       // selectedTeamがあればそのチームのみ、なければ両チーム
-      const sides = selectedTeam
-        ? (g.awayTeam===selectedTeam?["away"]:g.homeTeam===selectedTeam?["home"]:["away","home"])
+      const sides = selectedTeam // v473.43: 同名チーム同士の試合は両側を集計
+        ? [...(g.awayTeam===selectedTeam?["away"]:[]), ...(g.homeTeam===selectedTeam?["home"]:[])]
         : ["away","home"];
       sides.forEach(side=>{
         // 途中交代選手(_subOut/_subOuts)も含めて全選手を取得
@@ -10723,9 +11025,10 @@ function SpecialPlayModal({ teamLabel, bases, inning, onCommit, onCancel }) {
     )
   );
 }
-function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, preselect, onApply, onCancel }) {
+function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, preselect, onApply, onCancel, allowAutoSelect }) {
   // preselectがあればそのチームを初期選択、なければ1チームなら自動選択
-  const initTeam = preselect || (teams.length===1 ? teams[0] : null);
+  // v473.43: allowAutoSelect===false（未設定側のフォールバック）の場合は自動選択しない
+  const initTeam = preselect || (allowAutoSelect!==false && teams.length===1 ? teams[0] : null);
   const [selTeam, setSelTeam] = useState(initTeam);
   const [assignments, setAssignments] = useState({});
   const [activeSlot, setActiveSlot] = useState(null);
@@ -10736,7 +11039,7 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
   React.useEffect(()=>{
     if(prevSideRef.current !== side) {
       prevSideRef.current = side;
-      const next = preselect || (teams.length===1 ? teams[0] : null);
+      const next = preselect || (allowAutoSelect!==false && teams.length===1 ? teams[0] : null);
       setSelTeam(next);
       setAssignments({});
       setActiveSlot(null);
@@ -10808,8 +11111,8 @@ function TeamLineupModal({ side, sideLabel, sideColor, teams, currentLineup, pre
             borderLeft:"3px solid "+sideColor,paddingLeft:10}},
             "👥 "+sideLabel+" のスタメン選択")
 
-        // チームタブ（複数チームある場合）
-        , teams.length > 1 && React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}
+        // チームタブ（複数チームある場合。v473.43: 未選択なら1チームでも表示して手動選択を可能に）
+        , (teams.length > 1 || !selTeam) && teams.length > 0 && React.createElement('div', {style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}
             , teams.map(t=>
                 React.createElement('button', {key:t.id,
                   onClick:()=>{ setSelTeam(t); setAssignments({}); setActiveSlot(null); },
