@@ -713,59 +713,6 @@ const eShort = (e) => { const n=norm(e); return (_optionalChain([rOf, 'call', _2
 const eRuns  = (list) => list.reduce((s,e)=>s+(norm(e).runs||0),0);
 const toList = (ab,inn) => { if(!ab||ab[inn]==null) return []; return Array.isArray(ab[inn])?ab[inn]:[ab[inn]]; };
 
-// ================================================================
-// 🔄 この回をやり直す機能（v473.45）用ヘルパー
-// ================================================================
-// 指定チームの、指定イニングまで（含む）の総打席数を数える（打順計算用）
-const computeBatterCountThroughInning = (game, team, uptoInning) => {
-  const lineup = game[team+"Lineup"]||[];
-  let total = 0;
-  lineup.forEach(p=>{
-    for(let i=1;i<=uptoInning;i++){ total += toList(p.atBats, i).length; }
-    (p._subOuts||[]).forEach(so=>{
-      for(let i=1;i<=uptoInning;i++){ total += toList(so.atBats, i).length; }
-    });
-    if(p._subOut && !p._subOuts){
-      for(let i=1;i<=uptoInning;i++){ total += toList(p._subOut.atBats, i).length; }
-    }
-  });
-  return total;
-};
-// 指定チーム・指定回（表/裏はチームで自動決定）に選手交代が起きていた/古い形式で判定不能かをチェック
-const hasSubRiskInHalf = (game, team, inning) => {
-  const lineup = game[team+"Lineup"]||[];
-  const half = team==="away" ? "top" : "bottom";
-  let risky = false;
-  lineup.forEach(p=>{
-    const subs = [...(p._subOuts||[]), ...((p._subOut&&!p._subOuts)?[p._subOut]:[])];
-    subs.forEach(so=>{
-      if(so.subInning===undefined || so.subHalf===undefined) risky = true; // 旧形式：安全側でリスク扱い
-      else if(so.subInning===inning && so.subHalf===half) risky = true;
-    });
-  });
-  return risky;
-};
-// 指定チーム・指定回の開始時点で有効だった投手Idxと、defTeamPitcherLogの「その時点までの件数」を返す
-const getPitcherLogStateAtHalfStart = (game, team, inning) => {
-  const defTeam = team==="away" ? "home" : "away";
-  const half = team==="away" ? "top" : "bottom";
-  const log = game[defTeam+"PitcherLog"]||[];
-  // (fromInning, fromHalf) が (inning, half) より厳密に前のものだけが「開始時点で有効」
-  const before = log.filter(e=>{
-    const eh = e.fromHalf==="bottom" ? 1 : 0;
-    const th = half==="bottom" ? 1 : 0;
-    return (e.fromInning < inning) || (e.fromInning===inning && eh < th);
-  });
-  const during = log.filter(e=> e.fromInning===inning && e.fromHalf===half);
-  const after = log.filter(e=>{
-    const eh = e.fromHalf==="bottom" ? 1 : 0;
-    const th = half==="bottom" ? 1 : 0;
-    return (e.fromInning > inning) || (e.fromInning===inning && eh > th);
-  });
-  const startPitcherIdx = before.length>0 ? before[before.length-1].pitcherIdx : 0;
-  return {defTeam, half, before, during, after, startPitcherIdx};
-};
-
 const POS_ABBR = {
   "投手":"投","捕手":"捕","一塁手":"一","二塁手":"二","三塁手":"三",
   "遊撃手":"遊","左翼手":"左","中堅手":"中","右翼手":"右","指名打者":"指",
@@ -1599,6 +1546,11 @@ const computePitcherStats = (g) => { // 🔒 LOCKED - v447/v468仕様 変更禁�
       return findActivePitcher(ab.seq);
     };
 
+    // v473.47: この試合が「責任投手ベースの失点記録」を持つ新形式かを判定。
+    // 新形式なら打席runsからの失点計上をスキップし、baserunnerRunsのみを使う（二重計上防止）
+    const _respRunsCheck = Array.isArray(g.baserunnerRuns) ? g.baserunnerRuns : (g.baserunnerRuns ? Object.values(g.baserunnerRuns) : []);
+    const _hasRespRuns = _respRunsCheck.some(br=>br && br._fromAtBat);
+
     allAtBats.forEach(ab=>{
       let activePIdx = resolveActivePitcher(ab);
 
@@ -1612,9 +1564,11 @@ const computePitcherStats = (g) => { // 🔒 LOCKED - v447/v468仕様 変更禁�
       if(code==="HBP") ps.autoHbp = (ps.autoHbp||0)+1;
       if(code==="HR") ps.autoHr = (ps.autoHr||0)+1;
       const runsScored = ab.entry.runs||0;
-      if(runsScored > 0) {
+      if(runsScored > 0 && !_hasRespRuns) {
         // 失点(autoRuns)は機械的に決まるため自動計算。
         // 自責点(autoEr)はエラー絡みの判定が必要なため、得点時の自責点モーダルで人間が記録する(ここでは加算しない)
+        // v473.47: baserunnerRunsに_fromAtBat付きの記録がある新形式データでは、
+        // 責任投手ベースで下の_brRunsListから計上するため、ここではスキップ（二重計上防止）
         ps.autoRuns = (ps.autoRuns||0) + runsScored;
       }
     });
@@ -1787,14 +1741,58 @@ const OWAPRO_SELF_TEST = function(){
     T("投手:振り逃げも奪三振・併殺2アウト", p5.home[0].autoK===2&&p5.home[0]._outsGot===3, p5.home[0].autoK+"/"+p5.home[0]._outsGot);
 
     // ---- 既知の未修正バグ（13〜15件目・knownBugId付き。直るまで⚠️扱いでzipは止めない）----
-    // ⑤ 継投時の失点帰属：出塁を許した投手ではなく現在登板中の投手に付いてしまう
+    // ⑤ 継投時の失点帰属：v473.47で修正。責任投手（出塁を許した投手）に失点が付く
+    // 新形式では commitAtBat が baserunnerRuns に _fromAtBat 付きで責任投手ごとの失点を記録する
     var p6 = computePitcherStats({innings:1, finished:false, awayPitcherIdx:0, homePitcherIdx:1,
       awayPitchers:[{name:"敵投手"}], homePitchers:[{name:"A"},{name:"B"}],
       awayPitcherLog:basePLog("bottom"),
       homePitcherLog:[{pitcherIdx:0,fromInning:1,fromHalf:"top",outsAtStart:0,atBatSeq:0},{pitcherIdx:1,fromInning:1,fromHalf:"top",outsAtStart:0,atBatSeq:1}],
       awayLineup:[mkP("b1",{1:[{code:"BB",pLogIdx:0}]}),mkP("b2",{1:[{code:"H2",runs:1,pLogIdx:1}]})],
+      homeLineup:[mkP("h1",{1:[]})], baserunnerOuts:[],
+      // Aが出したb1が生還 → Aの失点
+      baserunnerRuns:[{inning:1, half:"top", defTeam:"home", pitcherIdx:0, runs:1, _fromAtBat:true}]});
+    T("投手:継投時は出塁を許した投手に失点計上", p6.home[0].autoRuns===1&&(p6.home[1].autoRuns||0)===0, "A="+(p6.home[0].autoRuns||0)+" B="+(p6.home[1].autoRuns||0));
+
+    // 旧形式（_fromAtBatなし）は従来通り打席runsから計上され、非退行であること
+    var p6old = computePitcherStats({innings:1, finished:false, awayPitcherIdx:0, homePitcherIdx:1,
+      awayPitchers:[{name:"敵投手"}], homePitchers:[{name:"A"},{name:"B"}],
+      awayPitcherLog:basePLog("bottom"),
+      homePitcherLog:[{pitcherIdx:0,fromInning:1,fromHalf:"top",outsAtStart:0,atBatSeq:0},{pitcherIdx:1,fromInning:1,fromHalf:"top",outsAtStart:0,atBatSeq:1}],
+      awayLineup:[mkP("b1",{1:[{code:"BB",pLogIdx:0}]}),mkP("b2",{1:[{code:"H2",runs:1,pLogIdx:1}]})],
       homeLineup:[mkP("h1",{1:[]})], baserunnerOuts:[]});
-    T("[既知#5]投手:継投時は出塁を許した投手に失点計上", p6.home[0].autoRuns===1, "A="+(p6.home[0].autoRuns||0)+" B="+(p6.home[1].autoRuns||0), "PITCHER_RUN_ATTRIBUTION");
+    T("投手:旧形式データの失点計上は非退行", (p6old.home[0].autoRuns||0)+(p6old.home[1].autoRuns||0)===1, "A="+(p6old.home[0].autoRuns||0)+" B="+(p6old.home[1].autoRuns||0));
+
+    // ---- v473.47: 失点帰属・守備位置履歴 ----
+    // 責任投手ベースの失点：3投手ぶんが正しく振り分けられる
+    var p8 = computePitcherStats({innings:1, finished:false, awayPitcherIdx:0, homePitcherIdx:2,
+      awayPitchers:[{name:"敵"}], homePitchers:[{name:"A"},{name:"B"},{name:"C"}],
+      awayPitcherLog:basePLog("bottom"),
+      homePitcherLog:[{pitcherIdx:0,fromInning:1,fromHalf:"top",outsAtStart:0,atBatSeq:0},
+                      {pitcherIdx:1,fromInning:1,fromHalf:"top",outsAtStart:0,atBatSeq:1},
+                      {pitcherIdx:2,fromInning:1,fromHalf:"top",outsAtStart:0,atBatSeq:2}],
+      awayLineup:[mkP("x1",{1:[{code:"BB",pLogIdx:0}]}),mkP("x2",{1:[{code:"BB",pLogIdx:1}]}),mkP("x3",{1:[{code:"HR",runs:3,pLogIdx:2}]})],
+      homeLineup:[mkP("h1",{1:[]})], baserunnerOuts:[],
+      baserunnerRuns:[{inning:1,half:"top",defTeam:"home",pitcherIdx:0,runs:1,_fromAtBat:true},
+                      {inning:1,half:"top",defTeam:"home",pitcherIdx:1,runs:1,_fromAtBat:true},
+                      {inning:1,half:"top",defTeam:"home",pitcherIdx:2,runs:1,_fromAtBat:true}]});
+    T("投手:3投手の走者がそれぞれの責任投手に1点ずつ帰属",
+      p8.home[0].autoRuns===1&&p8.home[1].autoRuns===1&&p8.home[2].autoRuns===1,
+      p8.home.map(function(x){return x.autoRuns||0;}).join(","));
+
+    // 守備位置履歴：玉突き(_swap)は除外し、意図的な変更は同一イニングでも全て残る
+    var _posLogFilter = function(rawPosLog){
+      var hasSwapMark = rawPosLog.some(function(l){ return l && l._swap!==undefined; });
+      return hasSwapMark
+        ? rawPosLog.filter(function(l){ return !l._swap; })
+        : rawPosLog.filter(function(l,i,arr){ return i===0||arr[i-1].inning!==l.inning||arr[i-1].half!==l.half; });
+    };
+    var _oldFormat = [{pos:"中",inning:4,half:"top"},{pos:"投",inning:4,half:"top"}];
+    T("守備履歴:旧データ(_swapなし)は従来通りの重複除去で互換維持",
+      _posLogFilter(_oldFormat).length===1, _posLogFilter(_oldFormat).length);
+    var _withSwap = [{pos:"中",inning:4,half:"top"},{pos:"投",inning:4,half:"top",_swap:true},{pos:"中",inning:4,half:"top"}];
+    T("守備履歴:玉突き分のみ除外し同一イニングの意図的変更は全て残る",
+      _posLogFilter(_withSwap).length===2 && _posLogFilter(_withSwap).map(function(l){return l.pos;}).join("")==="中中",
+      _posLogFilter(_withSwap).map(function(l){return l.pos;}).join("→"));
 
     // ⑥ recomputeScores：打席runsを下方修正しても得点が下がらない
     var g6a = {innings:1, awayScore:{1:"3"}, homeScore:{}, awayLineup:[mkP("a1",{1:[{code:"H1",runs:2}]})], homeLineup:[]};
@@ -1812,36 +1810,6 @@ const OWAPRO_SELF_TEST = function(){
       homeLineup:[mkP("h1",{1:[]})],
       baserunnerOuts:[{inning:1,half:"top",outsAtTime:1,defTeam:"home",pitcherIdx:0}]});
     T("[既知#7]投手:旧データで走塁アウトが継投境界に反映", p7.home[0]._outsGot===2&&p7.home[1]._outsGot===2, "A="+p7.home[0]._outsGot+" B="+p7.home[1]._outsGot, "LEGACY_FROMSEQ_BASERUNNER_OUT");
-
-    // ---- この回をやり直す機能のヘルパー（16〜19件目・v473.45） ----
-    var gR1 = {awayLineup:[
-      mkP("a1",{1:[{code:"GO"}],2:[{code:"H1"}]}),
-      mkP("a2",{1:[{code:"K"}],2:[{code:"BB"}]}),
-      mkP("a3",{1:[{code:"FO"}]})
-    ]};
-    T("やり直し:打席数カウント(1回まで=3)", computeBatterCountThroughInning(gR1,"away",1)===3, computeBatterCountThroughInning(gR1,"away",1));
-    T("やり直し:打席数カウント(2回まで=5)", computeBatterCountThroughInning(gR1,"away",2)===5, computeBatterCountThroughInning(gR1,"away",2));
-
-    var gR3 = {awayLineup:[
-      {name:"a1",atBats:{1:[{code:"GO"}]}, _subOuts:[{name:"旧a1",atBats:{1:[{code:"K"}]},subInning:1,subHalf:"top"}]}
-    ]};
-    T("やり直し:対象回に交代タグ一致→リスク検知", hasSubRiskInHalf(gR3,"away",1)===true, hasSubRiskInHalf(gR3,"away",1));
-    T("やり直し:別の回は対象外→リスクなし", hasSubRiskInHalf(gR3,"away",2)===false, hasSubRiskInHalf(gR3,"away",2));
-
-    var gR4 = {awayLineup:[
-      {name:"a1",atBats:{1:[{code:"GO"}]}, _subOuts:[{name:"旧a1",atBats:{1:[{code:"K"}]}}]} // subInning/subHalfなし(旧形式)
-    ]};
-    T("やり直し:旧形式(タグなし交代)は安全側でリスク扱い", hasSubRiskInHalf(gR4,"away",1)===true, hasSubRiskInHalf(gR4,"away",1));
-
-    var gR5 = {homePitcherLog:[
-      {pitcherIdx:0, fromInning:1, fromHalf:"top"},
-      {pitcherIdx:1, fromInning:2, fromHalf:"top"},
-      {pitcherIdx:2, fromInning:3, fromHalf:"top"}
-    ]};
-    var pR5 = getPitcherLogStateAtHalfStart(gR5, "away", 2);
-    T("やり直し:回開始時点の投手ログ分割(before/during/after)",
-      pR5.defTeam==="home" && pR5.startPitcherIdx===0 && pR5.before.length===1 && pR5.during.length===1 && pR5.after.length===1,
-      pR5.defTeam+"/"+pR5.startPitcherIdx+"/"+pR5.before.length+"/"+pR5.during.length+"/"+pR5.after.length);
   } catch(err) {
     T("実行エラーなし", false, err&&err.message);
   }
@@ -2306,6 +2274,8 @@ function App() {
   const game = rawGame ? {
     ...rawGame,
     bases:          _toBases(rawGame.bases),
+    // v473.47: 各塁の走者を出塁させた責任投手idx（失点の正しい帰属用）
+    baseResp:       _toBases(rawGame.baseResp),
     awayLineup:     _toArr(rawGame.awayLineup, []).map(_fixPlayer),
     homeLineup:     _toArr(rawGame.homeLineup, []).map(_fixPlayer),
     awayPitchers:   _toArr(rawGame.awayPitchers, []),
@@ -2747,9 +2717,44 @@ function App() {
       const scoreKey2 = team+"Score";
       const curInnScore = parseInt(g[scoreKey2]?.[inning])||0;
       const directScore = runs>0 ? {...g[scoreKey2], [inning]: curInnScore + runs} : g[scoreKey2];
+
+      // v473.47: 責任投手の追跡（失点の正しい帰属）
+      // 各塁の走者を「誰の投手のときに出塁したか」で追い、得点時はその投手に失点を付ける
+      const _defTeamNow = team==="away" ? "home" : "away";
+      const _curPIdxNow = g[_defTeamNow+"PitcherIdx"];
+      const _prevBases = Array.isArray(g.bases) ? g.bases : [null,null,null];
+      const _prevResp  = Array.isArray(g.baseResp) ? g.baseResp : [null,null,null];
+      // 打者本人の責任投手は「今投げている投手」
+      const _respOf = (name) => {
+        if(name === batterName) return _curPIdxNow;
+        const bi = _prevBases.indexOf(name);
+        return bi >= 0 && _prevResp[bi] != null ? _prevResp[bi] : _curPIdxNow;
+      };
+      // 得点した走者ごとに、その走者を出した投手の失点として記録
+      let brRunsAcc = Array.isArray(g.baserunnerRuns) ? [...g.baserunnerRuns] : (g.baserunnerRuns ? Object.values(g.baserunnerRuns) : []);
+      if(runs > 0 && !changeOccurs){
+        const _tally = {};
+        (scoredNames||[]).forEach(n=>{
+          const r = _respOf(n);
+          if(r != null) _tally[r] = (_tally[r]||0) + 1;
+        });
+        Object.keys(_tally).forEach(k=>{
+          brRunsAcc.push({inning, half:g.half, defTeam:_defTeamNow, pitcherIdx:parseInt(k), runs:_tally[k], _fromAtBat:true});
+        });
+      }
+      // 新しい塁状況に対応する責任投手を組み立て
+      const _newBasesArr = changeOccurs ? [null,null,null] : (newBases!==undefined ? newBases : _prevBases);
+      const _newResp = changeOccurs ? [null,null,null] : [0,1,2].map(j=>{
+        const nm = _newBasesArr[j];
+        if(!nm) return null;
+        return _respOf(nm);
+      });
+
       const tmp={...g, [lk]:lineup, ...defLineupUpdate, _bso_b:0, _bso_s:0,
         [scoreKey2]: directScore,
-        bases: changeOccurs ? [null,null,null] : (newBases!==undefined ? newBases : g.bases),
+        bases: _newBasesArr,
+        baseResp: _newResp,
+        baserunnerRuns: brRunsAcc,
         outs:  newOuts!==undefined  ? (changeOccurs?0:newOuts) : g.outs,
         inning: changeOccurs ? (g.half==="top"?g.inning:Math.min(g.inning+1,15)) : g.inning,
         half:   changeOccurs ? (g.half==="top"?"bottom":"top") : g.half,
@@ -2819,12 +2824,7 @@ function App() {
     const wasChange = newOuts>=3;
     if(wasChange){
       setModal(null);
-      // v473.45: この回やり直しモード中に3アウトに達したら、通常の次イニング進行の代わりに確定処理を行う
-      if(game.redoContext && game.redoContext.active && game.redoContext.team===team){
-        finalizeRedoInningIfNeeded();
-      } else {
-        showToast(`チェンジ！ ${_optionalChain([rOf, 'call', _9 => _9(code), 'optionalAccess', _10 => _10.label])||code} 記録`);
-      }
+      showToast(`チェンジ！ ${_optionalChain([rOf, 'call', _9 => _9(code), 'optionalAccess', _10 => _10.label])||code} 記録`);
     } else {
       // 得点があれば自責点モーダルを表示(次打者モーダルより優先)
       const hasRuns = (runs||0) > 0;
@@ -2935,16 +2935,26 @@ function App() {
 
       // 全ランナーの移動を処理（3塁→2塁→1塁の順で処理して衝突防止）
       const sortedMoves = [...moves].sort((a,b)=>b.runner.bi - a.runner.bi);
+      // v473.47: 責任投手を走者と一緒に動かす
+      const _prevRespSB = Array.isArray(g.baseResp) ? g.baseResp : [null,null,null];
+      const _brDefTeamNow = team==="away"?"home":"away";
+      const _curPIdxSB = g[_brDefTeamNow+"PitcherIdx"]||0;
+      let newResp = [..._prevRespSB];
+      const _scoredResp = []; // 生還した走者の責任投手idx
       sortedMoves.forEach(({runner, destBi, isOut})=>{
+        const respOfRunner = _prevRespSB[runner.bi] != null ? _prevRespSB[runner.bi] : _curPIdxSB;
         newBases[runner.bi] = null; // 元の塁を空に
+        newResp[runner.bi] = null;
         if(isOut){
           // アウト: 何もしない（塁をnullにするだけ）
         } else if(destBi >= 3){
           // 本塁到達
           scoreAdd++;
           scoredRunners.push(runner.name);
+          _scoredResp.push(respOfRunner);
         } else {
           newBases[destBi] = runner.name;
+          newResp[destBi] = respOfRunner;
         }
       });
 
@@ -3000,15 +3010,21 @@ function App() {
 
       // v473.38: 走塁による得点（本盗・WP・PB・BK等）を投手の失点として記録
       // atBatsのrunsに含まれないため、これがないと失点(autoRuns)から漏れる
+      // v473.47: 出塁を許した責任投手ごとに集計して計上する
       let brRuns = Array.isArray(g.baserunnerRuns) ? [...g.baserunnerRuns] : (g.baserunnerRuns ? Object.values(g.baserunnerRuns) : []);
       if(scoreAdd > 0) {
-        brRuns.push({inning:g.inning, half:g.half, defTeam:brDefTeam, pitcherIdx:brPitcherIdx, runs:scoreAdd});
+        const _tallySB = {};
+        _scoredResp.forEach(r=>{ const k = (r!=null?r:brPitcherIdx); _tallySB[k] = (_tallySB[k]||0)+1; });
+        Object.keys(_tallySB).forEach(k=>{
+          brRuns.push({inning:g.inning, half:g.half, defTeam:brDefTeam, pitcherIdx:parseInt(k), runs:_tallySB[k], _fromAtBat:true});
+        });
       }
 
       return {...g,
         [lk]:lineup,
         [scoreKey]:newScore,
         bases:finalBases,
+        baseResp: changeOccurs ? [null,null,null] : newResp,
         outs:changeOccurs?0:outs,
         inning:changeOccurs?(g.half==="top"?g.inning:Math.min(g.inning+1,15)):g.inning,
         half:changeOccurs?(g.half==="top"?"bottom":"top"):g.half,
@@ -3059,6 +3075,35 @@ function App() {
       const inn = g.inning;
       const prevRuns = parseInt(g[scoreKey][inn])||0;
       const scores = runs>0 ? {...g[scoreKey],[inn]:prevRuns+runs} : g[scoreKey];
+
+      // v473.47: 責任投手を追跡し、得点を失点として記録する
+      // （これがないと自責点だけ計上され「自責点＞失点」という不整合が起きる）
+      const _prevRespSP = Array.isArray(g.baseResp) ? g.baseResp : [null,null,null];
+      const _spDefTeam = team==="away"?"home":"away";
+      const _spCurPIdx = g[_spDefTeam+"PitcherIdx"]||0;
+      const _respOfSP = (name)=>{
+        const bi = oldBases.indexOf(name);
+        return (bi>=0 && _prevRespSP[bi]!=null) ? _prevRespSP[bi] : _spCurPIdx;
+      };
+      const _newRespSP = [0,1,2].map(j=>{
+        const nm = (newBases||[])[j];
+        if(!nm) return null;
+        return _respOfSP(nm);
+      });
+      let brRunsSP = Array.isArray(g.baserunnerRuns) ? [...g.baserunnerRuns] : (g.baserunnerRuns ? Object.values(g.baserunnerRuns) : []);
+      const _spScoredCount = (runs||0) > 0 ? runs : scoredRunners.length;
+      if(_spScoredCount > 0){
+        const _tallySP = {};
+        if(scoredRunners.length > 0){
+          scoredRunners.forEach(n=>{ const r=_respOfSP(n); _tallySP[r] = (_tallySP[r]||0)+1; });
+        } else {
+          _tallySP[_spCurPIdx] = _spScoredCount; // 走者名が特定できない場合は現投手
+        }
+        Object.keys(_tallySP).forEach(k=>{
+          brRunsSP.push({inning:inn, half:g.half, defTeam:_spDefTeam, pitcherIdx:parseInt(k), runs:_tallySP[k], _fromAtBat:true});
+        });
+      }
+
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
         msg:`【${g[team+"Team"]}】${_optionalChain([sp, 'optionalAccess', _16 => _16.label])||code}${runs>0?` [${runs}点]`:""}`
@@ -3067,6 +3112,8 @@ function App() {
         [team+"Lineup"]: updatedLineup,
         [scoreKey]:scores,
         bases:newBases,
+        baseResp:_newRespSP,
+        baserunnerRuns:brRunsSP,
         log,
       };
     });
@@ -3373,21 +3420,21 @@ function App() {
 
       const lineup = g[lk].map((p,i)=>{
         // スワップ対象の選手：outPlayerの元ポジションを引き受ける
+        // v473.47: 玉突きで自動的に動いた記録には_swap:trueを付け、ユーザーが明示的に行った変更と区別する
         if(i===swapTargetIdx) {
           const prevPosLog = p._posLog || [];
           return {...p, pos: swapTargetOldPos,
-            _posLog: [...prevPosLog, {pos: p.pos||"", inning: g.inning, half: g.half}]};
+            _posLog: [...prevPosLog, {pos: p.pos||"", inning: g.inning, half: g.half, _swap:true}]};
         }
         if(i!==outIdx) return p;
 
         if(isPosChange) {
-          // ポジション変更のみ → posLogに履歴を記録
+          // ポジション変更のみ → posLogに履歴を記録（ユーザーが明示的に行った変更）
           const prevPosLog = p._posLog || [];
           return {...p, pos: newPos, _posLog: [...prevPosLog, {pos: outPlayer.pos||"", inning: g.inning, half: g.half}]};
         }
 
         // 選手交代 → 元選手を_subOuts配列に追記（チェーン対応）
-        // v473.45: subInning/subHalfで「いつ交代したか」を記録（この回やり直し機能のリスク判定に使用）
         const prevSubOuts = p._subOuts || [];
         // 既に_subOutが1件ある古い形式も吸収
         const legacySubOut = p._subOut && !p._subOuts ? [p._subOut] : [];
@@ -3399,8 +3446,6 @@ function App() {
           cs: p.cs || 0,
           run: p.run || 0,
           e: p.e || 0,
-          subInning: g.inning,
-          subHalf: g.half,
         }];
 
         return {
@@ -3431,6 +3476,10 @@ function App() {
         outName:outPlayer.name, outPos:outPlayer.pos||"",
         inName:newName, inPos:newPos||"",
         reason:reason||"", ts,
+        // v473.47: 玉突きで押し出された選手の情報。表示時にまとめて扱う
+        swapName: swapTargetIdx>=0 ? ((g[lk][swapTargetIdx]||{}).name||"") : "",
+        swapFrom: swapTargetIdx>=0 ? newPos : "",
+        swapTo:   swapTargetIdx>=0 ? swapTargetOldPos : "",
       };
       const defenseLog = [...(g.defenseLog||[]), defEntry];
       // basesのランナー名も更新（代走の場合）
@@ -3450,142 +3499,7 @@ function App() {
     });
   },[mutGame]);
 
-  // ================================================================
-  // 🔄 この回をやり直す機能（v473.45）
-  // ================================================================
-  const startRedoInning = useCallback((team, inning)=>{
-    mutGame(g=>{
-      if(hasSubRiskInHalf(g, team, inning)){
-        showToast("⚠️ この回には選手交代が記録されているため、やり直せません");
-        return g;
-      }
-      const half = team==="away" ? "top" : "bottom";
-      const {defTeam, before, during, after, startPitcherIdx} = getPitcherLogStateAtHalfStart(g, team, inning);
-      const originalEndingBatterIdx = computeBatterCountThroughInning(g, team, inning) % ((g[team+"Lineup"]||[]).length||9);
-
-      const redoContext = {
-        active: true, team, defTeam, inning, half,
-        originalEndingBatterIdx,
-        preHalfLogLength: before.length,
-        duringCount: during.length,
-        afterLog: after, // 復元用に温存
-        savedLive: {
-          inning: g.inning, half: g.half, outs: g.outs, bases: g.bases,
-          awayBatterIdx: g.awayBatterIdx, homeBatterIdx: g.homeBatterIdx,
-          awayPitcherIdx: g.awayPitcherIdx, homePitcherIdx: g.homePitcherIdx,
-        },
-      };
-
-      // 対象半イニングのatBatsをクリア
-      const lk = team+"Lineup";
-      const lineup = g[lk].map(p=>{
-        const na = {...(p.atBats||{})};
-        delete na[inning];
-        return {...p, atBats:na};
-      });
-      // 対象半イニング中の投手ログをbeforeのみに切り詰め
-      const newDefLog = before;
-      // 対象半イニング中のbaserunnerOuts/Runsを除去
-      const filterHalf = arr => (arr||[]).filter(e=> !(e.inning===inning && e.half===half));
-      const newBrOuts = filterHalf(g.baserunnerOuts);
-      const newBrRuns = filterHalf(g.baserunnerRuns);
-      // 対象半イニングのスコアもリセット（recomputeScoresで再計算される）
-      const scoreKey = team+"Score";
-      const newScore = {...(g[scoreKey]||{})}; delete newScore[inning];
-
-      return {...g,
-        [lk]: lineup,
-        [defTeam+"PitcherLog"]: newDefLog,
-        [defTeam+"PitcherIdx"]: startPitcherIdx,
-        baserunnerOuts: newBrOuts,
-        baserunnerRuns: newBrRuns,
-        [scoreKey]: newScore,
-        inning, half, outs:0, bases:[null,null,null],
-        [team+"BatterIdx"]: computeBatterCountThroughInning(g, team, inning-1) % ((g[team+"Lineup"]||[]).length||9),
-        redoContext,
-      };
-    });
-    showToast("🔄 やり直しモード開始。この回を最初から入力してください");
-  },[mutGame]);
-
-  const cancelRedoInning = useCallback(()=>{
-    mutGame(g=>{
-      if(!g.redoContext || !g.redoContext.active) return g;
-      showToast("↩️ やり直しをキャンセルしました（元に戻せません。復元ポイントからの復旧が必要です）");
-      return g; // 実データの巻き戻しは複雑なため、キャンセル時は「redoContextを消して現状のまま」とする
-    });
-  },[mutGame]);
-
-  // commitAtBatでchangeOccurs(3アウト)が起きた直後に呼ぶ。redoContext中でなければ何もしない。
-  const finalizeRedoInningIfNeeded = useCallback(()=>{
-    mutGame(g=>{
-      const rc = g.redoContext;
-      if(!rc || !rc.active) return g;
-      const {team, defTeam, inning, half, originalEndingBatterIdx, preHalfLogLength, duringCount, afterLog, savedLive} = rc;
-
-      // 新しく記録された投手ログの件数
-      const curDefLog = g[defTeam+"PitcherLog"]||[];
-      const newDuringCount = curDefLog.length - preHalfLogLength;
-      const delta = newDuringCount - duringCount;
-
-      // afterLog(温存していた以降の投手交代)を末尾に復元
-      const mergedDefLog = [...curDefLog, ...afterLog];
-
-      // pLogIdxのシフト：team側(このteamは半イニングhalfで打撃=defTeamが投げていた)のatBatsのうち
-      // inningより後のものでpLogIdx >= preHalfLogLength+duringCount のものをdeltaだけシフト
-      const shiftIfNeeded = (entry) => {
-        if(entry && typeof entry.pLogIdx === "number" && entry.pLogIdx >= preHalfLogLength+duringCount){
-          return {...entry, pLogIdx: entry.pLogIdx+delta};
-        }
-        return entry;
-      };
-      const lk = team+"Lineup";
-      const shiftedLineup = (g[lk]||[]).map(p=>{
-        const na = {...(p.atBats||{})};
-        Object.keys(na).forEach(k=>{
-          const innNum = parseInt(k);
-          if(innNum > inning){
-            na[k] = toList(na, innNum).map(shiftIfNeeded);
-          }
-        });
-        const subOuts = (p._subOuts||[]).map(so=>{
-          const sna = {...(so.atBats||{})};
-          Object.keys(sna).forEach(k=>{
-            const innNum = parseInt(k);
-            if(innNum > inning){
-              sna[k] = toList(sna, innNum).map(shiftIfNeeded);
-            }
-          });
-          return {...so, atBats:sna};
-        });
-        return {...p, atBats:na, ...(p._subOuts?{_subOuts:subOuts}:{})};
-      });
-
-      // 打順ズレチェック
-      const newEndingBatterIdx = g[team+"BatterIdx"];
-      let batterOrderWarning = g.batterOrderWarning;
-      if(newEndingBatterIdx !== originalEndingBatterIdx){
-        batterOrderWarning = {
-          team, inning, half,
-          message: `${g[team+"Team"]||team}の${inning}回${half==="top"?"表":"裏"}やり直しで打順の人数が変わりました。${inning+1}回以降の打席担当がズレている可能性があります。オーダータブ・成績タブで確認してください。`,
-        };
-      }
-
-      // ライブ位置を元に戻す
-      return {...g,
-        [lk]: shiftedLineup,
-        [defTeam+"PitcherLog"]: mergedDefLog,
-        redoContext: null,
-        batterOrderWarning,
-        inning: savedLive.inning, half: savedLive.half, outs: savedLive.outs, bases: savedLive.bases,
-        awayBatterIdx: savedLive.awayBatterIdx, homeBatterIdx: savedLive.homeBatterIdx,
-        awayPitcherIdx: savedLive.awayPitcherIdx, homePitcherIdx: savedLive.homePitcherIdx,
-      };
-    });
-    showToast("✅ やり直し完了。元の試合の続きに戻りました");
-  },[mutGame]);
-
-
+  const changePitcher = useCallback((defTeam, newPitcherIdx)=>{
     if(window.__teamShareRole==="member"){ showToast("👥 メンバーは操作できません"); return; }
     mutGame(g=>{
       const logKey = defTeam+"PitcherLog";
@@ -4516,7 +4430,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{onClick:function(){var pw=window.prompt("");if(pw!==DEV_PASS)return;var r=OWAPRO_SELF_TEST();var realFail=r.filter(function(x){return !x.pass&&!x.knownBugId;});var known=r.filter(function(x){return !x.pass&&x.knownBugId;});var fixed=r.filter(function(x){return x.pass&&x.knownBugId;});var msg="🧪 自己診断 "+r.length+"件\n";msg+=realFail.length===0?"✅ 想定外の不合格なし\n":"❌ 想定外の不合格 "+realFail.length+"件\n"+realFail.map(function(x){return "・"+x.name+"("+x.detail+")";}).join("\n")+"\n";if(known.length>0)msg+="⚠️ 既知未修正 "+known.length+"件\n"+known.map(function(x){return "・"+x.name;}).join("\n")+"\n";if(fixed.length>0)msg+="🎉 既知バグが直っています！knownBugIdを外してテストを確定してください: "+fixed.map(function(x){return x.name;}).join(",");alert(msg);},style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.45")
+        , React.createElement('div',{onClick:function(){var pw=window.prompt("");if(pw!==DEV_PASS)return;var r=OWAPRO_SELF_TEST();var realFail=r.filter(function(x){return !x.pass&&!x.knownBugId;});var known=r.filter(function(x){return !x.pass&&x.knownBugId;});var fixed=r.filter(function(x){return x.pass&&x.knownBugId;});var msg="🧪 自己診断 "+r.length+"件\n";msg+=realFail.length===0?"✅ 想定外の不合格なし\n":"❌ 想定外の不合格 "+realFail.length+"件\n"+realFail.map(function(x){return "・"+x.name+"("+x.detail+")";}).join("\n")+"\n";if(known.length>0)msg+="⚠️ 既知未修正 "+known.length+"件\n"+known.map(function(x){return "・"+x.name;}).join("\n")+"\n";if(fixed.length>0)msg+="🎉 既知バグが直っています！knownBugIdを外してテストを確定してください: "+fixed.map(function(x){return x.name;}).join(",");alert(msg);},style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.47")
         
       )
 
@@ -4599,7 +4513,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.45")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.47")
         )
 
         // ===== 新規チーム作成 =====
@@ -4845,7 +4759,8 @@ function App() {
                     "成績タブ・シェアカードに年選択機能を追加（両者の数字のズレを解消）",
                     "同名チーム同士の試合で片側の選手成績が集計されないバグを修正",
                     "試合開始時、未設定側に同じチームが自動セットされるバグを修正",
-                    "スコア表の過去の回をタップして「この回をやり直す」機能を追加（交代のない回のみ対応）"
+                    "投手の失点を「走者を出した投手」に正しく計上（継投時の帰属を修正）・暴投等の失点漏れも修正",
+                    "守備位置の選択肢が画面外に出る問題・守備位置変更履歴の表示を修正"
                   ]},
                   {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
                   {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
@@ -5380,28 +5295,6 @@ function App() {
             )
           )
 
-          // v473.45: この回やり直しモード中の表示
-          , !isReadOnly && game.redoContext && game.redoContext.active && React.createElement('div', {
-              style:{background:"#3a2a0c",border:"2px solid #e08c24",borderRadius:12,padding:12,display:"flex",flexDirection:"column",gap:8}
-            }
-            , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#ffb52e"}},
-                "🔄 やり直しモード：", game[game.redoContext.team+"Team"]||game.redoContext.team, " ",
-                game.redoContext.inning, "回", game.redoContext.half==="top"?"表":"裏", " を入力中")
-            , React.createElement('div', {style:{fontSize:11,color:"#d4a574"}}, "3アウトで自動的に元の試合の続きに戻ります。3アウトにならない場合は下のボタンで手動確定してください。")
-            , React.createElement('button', {onClick:()=>finalizeRedoInningIfNeeded(),
-                style:{...sBt("#e08c24"),padding:"8px",fontSize:13,fontWeight:700}}, "✅ この回の入力をここで確定する")
-          )
-
-          // v473.45: 打順ズレ警告バナー
-          , !isReadOnly && game.batterOrderWarning && React.createElement('div', {
-              style:{background:"#2a1414",border:"2px solid #ff7d72",borderRadius:12,padding:12,display:"flex",flexDirection:"column",gap:8}
-            }
-            , React.createElement('div', {style:{fontSize:13,fontWeight:700,color:"#ff7d72"}}, "⚠️ 打順ズレの可能性")
-            , React.createElement('div', {style:{fontSize:12,color:"#f0b0aa",lineHeight:1.6}}, game.batterOrderWarning.message)
-            , React.createElement('button', {onClick:()=>mutGame(g=>({...g,batterOrderWarning:null})),
-                style:{...sBt("#4b6052"),padding:"6px",fontSize:12}}, "確認しました（閉じる）")
-          )
-
           , React.createElement('div', { style: appTheme==="light"?S.cardLight:S.card,}
             , React.createElement('div', { style: {overflowX:"auto"},}
               , React.createElement('table', { style: S.table,}
@@ -5460,14 +5353,7 @@ function App() {
                           // サヨナラ：後攻の最終回に×を付加
                           var showSayonara=sayonara&&row.team==="home"&&i===inn&&scoreStr!==""&&scoreStr!=="×";
                           var isColdEnd=isCold&&i===coldInning&&scoreStr!==""&&scoreStr!==undefined;
-                          // v473.45: この回をやり直す機能。過去に完了した半イニングのみタップ可能
-                          var _innTime2=i*2+(row.team==="home"?1:0);
-                          var _curTime2=curInn*2+(curHalf==="bottom"?1:0);
-                          var _redoEligible = !isReadOnly && !!game.started && !game.redoContext
-                            && _innTime2<_curTime2 && scoreStr!=="" && scoreStr!=="×";
-                          return React.createElement('td', { key: i, style: {...(appTheme==="light"?S.tdL:S.td),padding:2,textAlign:"center",
-                              cursor:_redoEligible?"pointer":"default"},
-                              onClick:_redoEligible?(()=>setModal({step:"redo_confirm",rTeam:row.team,rInning:i})):undefined,}
+                          return React.createElement('td', { key: i, style: {...(appTheme==="light"?S.tdL:S.td),padding:2,textAlign:"center"},}
                             , React.createElement('span', { style: {fontSize:scoreStr==="×"?13:16,fontWeight:700,color:scoreStr==="×"?"#74897b":"#fff",display:"block",padding:"4px 0"},}
                               , showSayonara?(scoreStr+"×"):isColdEnd?(scoreStr+"×"):scoreStr
                             )
@@ -5851,6 +5737,9 @@ function App() {
                   , React.createElement('span', { style: {color:"#4b6052",fontSize:10},}, "(", d.inPos||"-", ")")
                   , d.reason&&React.createElement('span', { style: {color:"#ffb52e",fontSize:10,
                     background:"#1a1000",border:"1px solid #3a2800",borderRadius:4,padding:"1px 6px"},}, d.reason)
+                  , d.swapName&&React.createElement('span', { style: {color:"#9fb3a5",fontSize:10,
+                    background:"#0f2040",border:"1px solid #24402b",borderRadius:4,padding:"1px 6px"},}
+                    , "玉突き: ", d.swapName, " ", abbrPos(d.swapFrom||"-"), "→", abbrPos(d.swapTo||"-"))
                   , React.createElement('span', { style: {color:"#2e4234",marginLeft:"auto",fontSize:10},}, d.ts)
                 )
               ))
@@ -5902,11 +5791,16 @@ function App() {
                       const subOuts = [...legacySubOut, ...(p._subOuts||[])];
 
                       // ポジション推移を文字列に（_posLogも含める）
-                      // 同一イニング・ハーフ内の中間ポジション変更は除外（玉突き変更対策）
-                      const posLogDeduped = (p._posLog||[]).filter((l,i,arr)=>{
-                        // 同じinning+halfの中では最初のエントリだけ残す
-                        return i===0||arr[i-1].inning!==l.inning||arr[i-1].half!==l.half;
-                      });
+                      // v473.47: 玉突きで自動的に動いた分(_swap)のみ除外する。
+                      // 従来は「同一イニングは最初だけ」としていたため、同じ回に意図的に2回変更すると
+                      // 1回目が消えていた（例：中→投→中 が「中」だけになる）
+                      const _rawPosLog = p._posLog||[];
+                      const _hasSwapMark = _rawPosLog.some(l=>l && l._swap!==undefined);
+                      const posLogDeduped = _hasSwapMark
+                        ? _rawPosLog.filter(l=>!l._swap)
+                        : _rawPosLog.filter((l,i,arr)=>
+                            // 旧データ（_swapマークなし）は従来通りの重複除去で互換維持
+                            i===0||arr[i-1].inning!==l.inning||arr[i-1].half!==l.half);
                       const posLogHistory = posLogDeduped.map(l=>l.pos).filter(Boolean);
                       const allPosHistory = [...subOuts.map(s=>s.pos||"—"), ...posLogHistory, p.pos||""].filter((_,i,a)=>i===0||a[i]!==a[i-1]);
                       const posHistory = allPosHistory;
@@ -6280,7 +6174,8 @@ function App() {
                     "成績タブ・シェアカードに年選択機能を追加（両者の数字のズレを解消）",
                     "同名チーム同士の試合で片側の選手成績が集計されないバグを修正",
                     "試合開始時、未設定側に同じチームが自動セットされるバグを修正",
-                    "スコア表の過去の回をタップして「この回をやり直す」機能を追加（交代のない回のみ対応）"
+                    "投手の失点を「走者を出した投手」に正しく計上（継投時の帰属を修正）・暴投等の失点漏れも修正",
+                    "守備位置の選択肢が画面外に出る問題・守備位置変更履歴の表示を修正"
                   ]},
                   {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
                   {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
@@ -7112,37 +7007,6 @@ function App() {
                           background:"#122016",border:"1px solid #2e4234",color:"#9fb3a5",fontSize:15,fontWeight:700}
                       }, "自責なし")
                   )
-            )
-          );
-        }
-
-        if(modal.step==="redo_confirm") {
-          const rTeam = modal.rTeam, rInning = modal.rInning;
-          const rRisky = hasSubRiskInHalf(game, rTeam, rInning);
-          const rHalf = rTeam==="away" ? "表" : "裏";
-          const rTeamName = game[rTeam+"Team"]||rTeam;
-          return (
-            React.createElement('div', { style: S.overlay, onClick: ()=>setModal(null),}
-              , React.createElement('div', { style: {...S.mBox,maxWidth:320}, onClick: e=>e.stopPropagation(),}
-                , React.createElement('div', { style: {...S.mt,marginBottom:8},}, "🔄 この回をやり直す" )
-                , React.createElement('div', { style: {fontSize:13,color:"#9fb3a5",marginBottom:14,lineHeight:1.6},}
-                  , rTeamName, " ", rInning, "回", rHalf, "の打席・ランナー・投手交代の記録を全て消して、最初から入力し直します。"
-                )
-                , rRisky
-                  ? React.createElement('div', { style: {fontSize:12,color:"#ff7d72",marginBottom:20,lineHeight:1.6,background:"#2a1414",padding:10,borderRadius:8},}
-                      , "⚠️ この回には選手交代が記録されている（または交代時期が不明な古いデータが含まれる）ため、安全のためやり直しできません。オーダータブから手動で修正してください。"
-                    )
-                  : React.createElement('div', { style: {fontSize:12,color:"#ffb52e",marginBottom:20,lineHeight:1.6},}
-                      , "⚠️ この操作は取り消せません。この回の打順の人数が変わると、以降の回の打順がズレる可能性があります（その場合は警告を表示します）。"
-                    )
-                , !rRisky && React.createElement('button', { onClick: ()=>{
-                    startRedoInning(rTeam, rInning);
-                    setModal(null);
-                    setTab("score");
-                  }, style: {...sBt("#e08c24"),width:"100%",padding:"12px",fontSize:14,fontWeight:700,marginBottom:8},}, "🔄 この回をやり直す"
-                  )
-                , React.createElement('button', { onClick: ()=>setModal(null), style: S.cBtn,}, "キャンセル")
-              )
             )
           );
         }
@@ -11713,23 +11577,31 @@ function PosSelector({ value, onChange }) {
   const handleOpen = () => {
     if (btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
+      const W = 178, PAD = 8;
+      // v473.47: 実際の高さを項目数から算出（従来の固定130pxは11項目3行の実高さ約150pxに足りず、
+      // 下部の行では「指」「代」が画面外に出て選べなかった）
+      const perRow = Math.max(1, Math.floor((W - PAD*2 + 5) / (46 + 5)));
+      const rows = Math.ceil(POS_OPTS.length / perRow);
+      const popupH = rows * 38 + (rows - 1) * 5 + PAD * 2;
       const spaceBelow = window.innerHeight - rect.bottom;
-      const popupH = 130; 
-      
-      const openUp = spaceBelow < popupH;
+      const spaceAbove = rect.top;
+      // 下に入らなければ上に開く。上にも入らなければ、入る側に寄せて画面内にクランプ
+      const openUp = spaceBelow < popupH + 8 && spaceAbove > spaceBelow;
+      let top = openUp ? rect.top - popupH - 4 : rect.bottom + 4;
+      top = Math.max(8, Math.min(top, window.innerHeight - popupH - 8));
       setPopupStyle({
         position: "fixed",
-        left: Math.min(rect.left, window.innerWidth - 186),
-        top: openUp ? rect.top - popupH - 4 : rect.bottom + 4,
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - W - 8)),
+        top: top,
         zIndex: 9999,
         background: "linear-gradient(135deg,#0f2040,#0c160e)",
         border: "1px solid #33573c",
         borderRadius: 10,
-        padding: 8,
+        padding: PAD,
         display: "flex",
         flexWrap: "wrap",
         gap: 5,
-        width: 178,
+        width: W,
         boxShadow: "0 8px 32px rgba(0,0,0,.85)",
       });
     }
