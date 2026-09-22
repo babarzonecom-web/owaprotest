@@ -1779,20 +1779,25 @@ const OWAPRO_SELF_TEST = function(){
       p8.home[0].autoRuns===1&&p8.home[1].autoRuns===1&&p8.home[2].autoRuns===1,
       p8.home.map(function(x){return x.autoRuns||0;}).join(","));
 
-    // 守備位置履歴：玉突き(_swap)は除外し、意図的な変更は同一イニングでも全て残る
-    var _posLogFilter = function(rawPosLog){
-      var hasSwapMark = rawPosLog.some(function(l){ return l && l._swap!==undefined; });
-      return hasSwapMark
-        ? rawPosLog.filter(function(l){ return !l._swap; })
+    // 守備位置履歴（v473.48）：オーダー画面の表示ロジックと同じ規則で履歴文字列を作る
+    //  新形式（_swapフィールドあり）→ 自分の変更も玉突きで動かされた分も全て表示
+    //  旧形式（_swapフィールドなし）→ 同一イニングは最初の1件のみ（互換維持）
+    var _posHistStr = function(rawPosLog, curPos){
+      var hasMark = rawPosLog.some(function(l){ return l && l._swap!==undefined; });
+      var logs = hasMark ? rawPosLog
         : rawPosLog.filter(function(l,i,arr){ return i===0||arr[i-1].inning!==l.inning||arr[i-1].half!==l.half; });
+      var all = logs.map(function(l){return l.pos;}).filter(Boolean).concat([curPos])
+        .filter(function(_,i,a){ return i===0||a[i]!==a[i-1]; });
+      return all.join("→");
     };
-    var _oldFormat = [{pos:"中",inning:4,half:"top"},{pos:"投",inning:4,half:"top"}];
-    T("守備履歴:旧データ(_swapなし)は従来通りの重複除去で互換維持",
-      _posLogFilter(_oldFormat).length===1, _posLogFilter(_oldFormat).length);
-    var _withSwap = [{pos:"中",inning:4,half:"top"},{pos:"投",inning:4,half:"top",_swap:true},{pos:"中",inning:4,half:"top"}];
-    T("守備履歴:玉突き分のみ除外し同一イニングの意図的変更は全て残る",
-      _posLogFilter(_withSwap).length===2 && _posLogFilter(_withSwap).map(function(l){return l.pos;}).join("")==="中中",
-      _posLogFilter(_withSwap).map(function(l){return l.pos;}).join("→"));
+    var _hKato = _posHistStr([{pos:"中",inning:4,half:"top",_swap:false},{pos:"投",inning:4,half:"top",_swap:true}], "中");
+    T("守備履歴:自分で変更→玉突きで戻された選手が 中→投→中", _hKato==="中→投→中", _hKato);
+    var _hSwapped = _posHistStr([{pos:"投",inning:4,half:"top",_swap:true}], "中");
+    T("守備履歴:玉突きで動かされた選手も 投→中 と表示", _hSwapped==="投→中", _hSwapped);
+    var _hTwice = _posHistStr([{pos:"中",inning:4,half:"top",_swap:false},{pos:"投",inning:4,half:"top",_swap:false}], "中");
+    T("守備履歴:同一イニングの2回の変更が両方残る", _hTwice==="中→投→中", _hTwice);
+    var _hOld = _posHistStr([{pos:"中",inning:4,half:"top"},{pos:"投",inning:4,half:"top"}], "二");
+    T("守備履歴:旧データ(_swapなし)は従来通りの重複除去で互換維持", _hOld==="中→二", _hOld);
 
     // ⑥ recomputeScores：打席runsを下方修正しても得点が下がらない
     var g6a = {innings:1, awayScore:{1:"3"}, homeScore:{}, awayLineup:[mkP("a1",{1:[{code:"H1",runs:2}]})], homeLineup:[]};
@@ -2290,6 +2295,9 @@ function App() {
     awayScore:      (rawGame.awayScore && typeof rawGame.awayScore==="object") ? rawGame.awayScore : {},
     homeScore:      (rawGame.homeScore && typeof rawGame.homeScore==="object") ? rawGame.homeScore : {},
   } : rawGame;
+  // v473.48: useCallback([mutGame])で包まれた関数（recordSB等）から常に最新のgameを参照するためのref
+  const _gameRef = React.useRef(game);
+  _gameRef.current = game;
   const history   = storage.history||[];
   const undoStack = storage.undoStack||[];
   const teams      = storage.teams||[];
@@ -2907,8 +2915,12 @@ function App() {
   const recordSB = useCallback((team, moves, type, primaryPidx)=>{
     const isOutType = type==="CS" || type==="PO" || type==="RO";
     const isSB      = type==="SB";
-    let _scoredForEr = [];  // 得点した走者(自責点モーダル用にmutGameの外で保持)
-    let _erInning = game.inning;
+    // v473.48: 自責点モーダル用の生還者は mutGame の外で moves から直接求める。
+    // 従来は mutGame の更新関数の中で代入していたが、React 18 では更新関数の実行が
+    // 後回しになることがあり（直前に別の更新がある時など）、判定時点で空配列のまま
+    // 「誰の自責点ですか？」が出なかった（暴投・ボーク等の走塁得点で発生）
+    const _scoredForEr = (moves||[]).filter(m=>!m.isOut && m.destBi>=3).map(m=>m.runner.name);
+    const _erInning = (_gameRef.current||game).inning;
 
     mutGame(g=>{
       const lk = team+"Lineup";
@@ -2969,8 +2981,7 @@ function App() {
       lineup = lineup.map(p=>
         scoredRunners.includes(p.name) ? {...p, run:(p.run||0)+1} : p
       );
-      _scoredForEr = [...scoredRunners];  // 自責点モーダル用に保持
-      _erInning = g.inning;
+      // （自責点モーダル用の生還者は関数冒頭で算出済み）
 
       // アウトカウント（isOutのmoveの数だけ増やす）
       const outsAdded = moves.filter(m=>m.isOut).length;
@@ -3033,7 +3044,7 @@ function App() {
         log};
     });
     // チェンジになった場合のみストライク・ボールカウントをリセット（球数は保持）
-    const outsAfter = (game.outs||0) + moves.filter(m=>m.isOut).length;
+    const outsAfter = ((_gameRef.current||game).outs||0) + moves.filter(m=>m.isOut).length;
     if(outsAfter >= 3) {
       setPitchCount(p=>({b:0,s:0,f:0}));
       setPitchHistory([]);
@@ -3056,16 +3067,19 @@ function App() {
   
   const recordSpecialPlay = useCallback((team, code, advanceBases, runs)=>{
     const sp = SPECIAL_PLAYS.find(p=>p.code===code);
-    let _scoredSP = [];
-    let _innSP = game.inning;
+    // v473.48: 自責点モーダル用の生還者・イニングは mutGame の外で最新の game から求める
+    // （更新関数の中で代入すると実行が後回しになり、モーダルが出ないことがあった）
+    const _gNow = _gameRef.current || game;
+    const _gbNow = Array.isArray(_gNow.bases) ? _gNow.bases : [0,1,2].map(i => (_gNow.bases&&_gNow.bases[i]!=null)?_gNow.bases[i]:null);
+    const _nbNow = advanceBases !== undefined ? advanceBases : _gbNow;
+    const _scoredSP = _gbNow.filter(n => n && !(_nbNow||[]).includes(n));
+    const _innSP = _gNow.inning;
     mutGame(g=>{
       const _gb2 = Array.isArray(g.bases) ? g.bases : [0,1,2].map(i => (g.bases&&g.bases[i]!=null)?g.bases[i]:null);
       const newBases = advanceBases !== undefined ? advanceBases : _gb2;
       // 得点したランナー名を特定（元の塁から消えて新basesにもいない選手）
       const oldBases = _gb2;
       const scoredRunners = (oldBases).filter(n => n && !(newBases||[]).includes(n));
-      _scoredSP = [...scoredRunners];
-      _innSP = g.inning;
       const updatedLineup = g[team+"Lineup"].map(p => {
         if(scoredRunners.includes(p.name)) return {...p, run:(p.run||0)+1};
         return p;
@@ -3431,7 +3445,7 @@ function App() {
         if(isPosChange) {
           // ポジション変更のみ → posLogに履歴を記録（ユーザーが明示的に行った変更）
           const prevPosLog = p._posLog || [];
-          return {...p, pos: newPos, _posLog: [...prevPosLog, {pos: outPlayer.pos||"", inning: g.inning, half: g.half}]};
+          return {...p, pos: newPos, _posLog: [...prevPosLog, {pos: outPlayer.pos||"", inning: g.inning, half: g.half, _swap:false}]};
         }
 
         // 選手交代 → 元選手を_subOuts配列に追記（チェーン対応）
@@ -4430,7 +4444,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{onClick:function(){var pw=window.prompt("");if(pw!==DEV_PASS)return;var r=OWAPRO_SELF_TEST();var realFail=r.filter(function(x){return !x.pass&&!x.knownBugId;});var known=r.filter(function(x){return !x.pass&&x.knownBugId;});var fixed=r.filter(function(x){return x.pass&&x.knownBugId;});var msg="🧪 自己診断 "+r.length+"件\n";msg+=realFail.length===0?"✅ 想定外の不合格なし\n":"❌ 想定外の不合格 "+realFail.length+"件\n"+realFail.map(function(x){return "・"+x.name+"("+x.detail+")";}).join("\n")+"\n";if(known.length>0)msg+="⚠️ 既知未修正 "+known.length+"件\n"+known.map(function(x){return "・"+x.name;}).join("\n")+"\n";if(fixed.length>0)msg+="🎉 既知バグが直っています！knownBugIdを外してテストを確定してください: "+fixed.map(function(x){return x.name;}).join(",");alert(msg);},style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.47")
+        , React.createElement('div',{onClick:function(){var pw=window.prompt("");if(pw!==DEV_PASS)return;var r=OWAPRO_SELF_TEST();var realFail=r.filter(function(x){return !x.pass&&!x.knownBugId;});var known=r.filter(function(x){return !x.pass&&x.knownBugId;});var fixed=r.filter(function(x){return x.pass&&x.knownBugId;});var msg="🧪 自己診断 "+r.length+"件\n";msg+=realFail.length===0?"✅ 想定外の不合格なし\n":"❌ 想定外の不合格 "+realFail.length+"件\n"+realFail.map(function(x){return "・"+x.name+"("+x.detail+")";}).join("\n")+"\n";if(known.length>0)msg+="⚠️ 既知未修正 "+known.length+"件\n"+known.map(function(x){return "・"+x.name;}).join("\n")+"\n";if(fixed.length>0)msg+="🎉 既知バグが直っています！knownBugIdを外してテストを確定してください: "+fixed.map(function(x){return x.name;}).join(",");alert(msg);},style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.48")
         
       )
 
@@ -4513,7 +4527,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.47")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.48")
         )
 
         // ===== 新規チーム作成 =====
@@ -4760,7 +4774,8 @@ function App() {
                     "同名チーム同士の試合で片側の選手成績が集計されないバグを修正",
                     "試合開始時、未設定側に同じチームが自動セットされるバグを修正",
                     "投手の失点を「走者を出した投手」に正しく計上（継投時の帰属を修正）・暴投等の失点漏れも修正",
-                    "守備位置の選択肢が画面外に出る問題・守備位置変更履歴の表示を修正"
+                    "守備位置の選択肢が画面外に出る問題・守備位置変更履歴の表示を修正",
+                    "暴投・ボーク等の得点で「誰の自責点ですか？」が出ない問題を修正・玉突きで動いた選手の守備履歴も表示"
                   ]},
                   {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
                   {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
@@ -5791,13 +5806,13 @@ function App() {
                       const subOuts = [...legacySubOut, ...(p._subOuts||[])];
 
                       // ポジション推移を文字列に（_posLogも含める）
-                      // v473.47: 玉突きで自動的に動いた分(_swap)のみ除外する。
-                      // 従来は「同一イニングは最初だけ」としていたため、同じ回に意図的に2回変更すると
-                      // 1回目が消えていた（例：中→投→中 が「中」だけになる）
+                      // v473.48: 新形式データ（_swapマーク付き）は、自分で変更した分も玉突きで動かされた分も
+                      // すべて表示する（例：加藤 中→投→中、玉突きで動いた選手も 投→中 と出る）。
+                      // 連続する同じポジションは下の allPosHistory で1つにまとめる。
                       const _rawPosLog = p._posLog||[];
                       const _hasSwapMark = _rawPosLog.some(l=>l && l._swap!==undefined);
                       const posLogDeduped = _hasSwapMark
-                        ? _rawPosLog.filter(l=>!l._swap)
+                        ? _rawPosLog
                         : _rawPosLog.filter((l,i,arr)=>
                             // 旧データ（_swapマークなし）は従来通りの重複除去で互換維持
                             i===0||arr[i-1].inning!==l.inning||arr[i-1].half!==l.half);
@@ -6175,7 +6190,8 @@ function App() {
                     "同名チーム同士の試合で片側の選手成績が集計されないバグを修正",
                     "試合開始時、未設定側に同じチームが自動セットされるバグを修正",
                     "投手の失点を「走者を出した投手」に正しく計上（継投時の帰属を修正）・暴投等の失点漏れも修正",
-                    "守備位置の選択肢が画面外に出る問題・守備位置変更履歴の表示を修正"
+                    "守備位置の選択肢が画面外に出る問題・守備位置変更履歴の表示を修正",
+                    "暴投・ボーク等の得点で「誰の自責点ですか？」が出ない問題を修正・玉突きで動いた選手の守備履歴も表示"
                   ]},
                   {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
                   {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
@@ -11583,12 +11599,13 @@ function PosSelector({ value, onChange }) {
       const perRow = Math.max(1, Math.floor((W - PAD*2 + 5) / (46 + 5)));
       const rows = Math.ceil(POS_OPTS.length / perRow);
       const popupH = rows * 38 + (rows - 1) * 5 + PAD * 2;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      // 下に入らなければ上に開く。上にも入らなければ、入る側に寄せて画面内にクランプ
-      const openUp = spaceBelow < popupH + 8 && spaceAbove > spaceBelow;
+      // v473.48: アプリ版（画面端まで描画）では下部のナビゲーションバーの裏まで
+      // 表示領域に含まれるため、下側に余白を確保し、画面下半分のボタンは常に上向きに開く
+      const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+      const BOTTOM_RESERVE = 90, TOP_RESERVE = 8;
+      const openUp = (rect.top + rect.bottom) / 2 > vh / 2;
       let top = openUp ? rect.top - popupH - 4 : rect.bottom + 4;
-      top = Math.max(8, Math.min(top, window.innerHeight - popupH - 8));
+      top = Math.max(TOP_RESERVE, Math.min(top, vh - popupH - BOTTOM_RESERVE));
       setPopupStyle({
         position: "fixed",
         left: Math.max(8, Math.min(rect.left, window.innerWidth - W - 8)),
