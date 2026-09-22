@@ -719,6 +719,43 @@ const POS_ABBR = {
   "内野手":"内","外野手":"外"
 };
 const abbrPos = (pos) => POS_ABBR[pos] || pos;
+
+// v473.49: 投手交代で「すでに出場している野手」が登板する場合の守備位置の玉突き。
+// 例）遊撃手Aが登板 → A:遊→投、それまでの投手B:投→遊
+// 戻り値 {g, note}。該当しない場合は g をそのまま返し note は null。
+// 投手が打順にいない（DH制など）場合はAを投に動かすだけで、空いた守備位置を note で知らせる。
+const applyPitcherPosSwap = (g, defTeam, newPitcherName) => {
+  const lk = defTeam+"Lineup";
+  const lu = g[lk]||[];
+  const newIdx = lu.findIndex(p=>p && p.name && p.name===newPitcherName);
+  if(newIdx<0) return {g, note:null};
+  const fromPos = lu[newIdx].pos||"";
+  if(abbrPos(fromPos)==="投") return {g, note:null};
+  const oldIdx = lu.findIndex((p,i)=>i!==newIdx && p && abbrPos(p.pos||"")==="投");
+  const lineup = lu.map((p,i)=>{
+    if(i===newIdx){
+      return {...p, pos:"投", _posLog:[...(p._posLog||[]), {pos:fromPos, inning:g.inning, half:g.half, _swap:false}]};
+    }
+    if(i===oldIdx){
+      return {...p, pos:fromPos, _posLog:[...(p._posLog||[]), {pos:p.pos||"投", inning:g.inning, half:g.half, _swap:true}]};
+    }
+    return p;
+  });
+  const oldP = oldIdx>=0 ? lu[oldIdx] : null;
+  const ts = new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"});
+  const defEntry = {
+    inning:g.inning, half:g.half, team:defTeam,
+    outName:newPitcherName, outPos:fromPos, inName:newPitcherName, inPos:"投",
+    reason:"", ts,
+    swapName: oldP ? (oldP.name||"") : "",
+    swapFrom: oldP ? "投" : "",
+    swapTo:   oldP ? fromPos : "",
+  };
+  const note = oldP
+    ? `${newPitcherName} ${abbrPos(fromPos)||"-"}→投 ／ ${oldP.name} 投→${abbrPos(fromPos)||"-"}`
+    : `${newPitcherName} ${abbrPos(fromPos)||"-"}→投（${abbrPos(fromPos)||"守備位置"}が空いています）`;
+  return {g:{...g, [lk]:lineup, defenseLog:[...(g.defenseLog||[]), defEntry]}, note, vacated: oldP ? null : fromPos};
+};
 /* ============================================================
    LiveField — 閲覧モード速報タブ用フィールド＋プレーアニメ
    グローバルスコープに定義（ZONES等の定数を利用）
@@ -1798,6 +1835,29 @@ const OWAPRO_SELF_TEST = function(){
     T("守備履歴:同一イニングの2回の変更が両方残る", _hTwice==="中→投→中", _hTwice);
     var _hOld = _posHistStr([{pos:"中",inning:4,half:"top"},{pos:"投",inning:4,half:"top"}], "二");
     T("守備履歴:旧データ(_swapなし)は従来通りの重複除去で互換維持", _hOld==="中→二", _hOld);
+
+    // ---- v473.49: 出場中の野手が登板したときの守備位置の玉突き ----
+    var _gSw = {inning:4, half:"top", defenseLog:[],
+      homeLineup:[{name:"A",pos:"遊"},{name:"B",pos:"投"},{name:"C",pos:"捕"}]};
+    var _rSw = applyPitcherPosSwap(_gSw, "home", "A");
+    var _luSw = _rSw.g.homeLineup;
+    T("投手交代:遊撃手が登板→ 遊→投 / 元投手 投→遊",
+      _luSw[0].pos==="投" && _luSw[1].pos==="遊" && _luSw[2].pos==="捕",
+      _luSw.map(function(p){return p.name+":"+p.pos;}).join(","));
+    T("投手交代:守備履歴が 遊→投 / 投→遊 と表示される",
+      _posHistStr(_luSw[0]._posLog, _luSw[0].pos)==="遊→投" && _posHistStr(_luSw[1]._posLog, _luSw[1].pos)==="投→遊",
+      _posHistStr(_luSw[0]._posLog, _luSw[0].pos)+" / "+_posHistStr(_luSw[1]._posLog, _luSw[1].pos));
+    T("投手交代:守備交代記録に玉突き付きで1件記録",
+      _rSw.g.defenseLog.length===1 && _rSw.g.defenseLog[0].swapName==="B" && _rSw.g.defenseLog[0].inPos==="投",
+      JSON.stringify(_rSw.g.defenseLog));
+    var _rNo = applyPitcherPosSwap(_gSw, "home", "Z");
+    T("投手交代:打順にいない投手（ベンチから登板）は守備位置を変えない",
+      _rNo.g===_gSw && _rNo.note===null, String(_rNo.note));
+    var _gDh = {inning:4, half:"top", defenseLog:[], homeLineup:[{name:"A",pos:"遊"},{name:"D",pos:"指"}]};
+    var _rDh = applyPitcherPosSwap(_gDh, "home", "A");
+    T("投手交代:投手が打順にいない(DH制)ときはA→投にして空いた守備位置を知らせる",
+      _rDh.g.homeLineup[0].pos==="投" && _rDh.g.homeLineup[1].pos==="指" && _rDh.vacated==="遊",
+      _rDh.g.homeLineup.map(function(p){return p.name+":"+p.pos;}).join(",")+" vacated="+_rDh.vacated);
 
     // ⑥ recomputeScores：打席runsを下方修正しても得点が下がらない
     var g6a = {innings:1, awayScore:{1:"3"}, homeScore:{}, awayLineup:[mkP("a1",{1:[{code:"H1",runs:2}]})], homeLineup:[]};
@@ -3584,13 +3644,21 @@ function App() {
         atBatSeq: atBatSeqNow, // 常に現時点の打席数を記録（イニング間交代も含む）
       };
       const newLog = [...(g[logKey]||[]), entry];
+      const _newPName = _optionalChain([g, 'access', _21 => _21[defTeam+"Pitchers"], 'access', _22 => _22[newPitcherIdx], 'optionalAccess', _23 => _23.name])||"新投手";
+      // v473.49: 出場中の野手が登板する場合は守備位置を自動で玉突き
+      const _sw = applyPitcherPosSwap(g, defTeam, _newPName);
       const log=[{
         ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-        msg:`【${g[defTeam+"Team"]}】投手交代: ${_optionalChain([g, 'access', _21 => _21[defTeam+"Pitchers"], 'access', _22 => _22[newPitcherIdx], 'optionalAccess', _23 => _23.name])||"新投手"} 登板（${g.inning}回${g.half==="top"?"表":"裏"}）`,
+        msg:`【${g[defTeam+"Team"]}】投手交代: ${_newPName} 登板（${g.inning}回${g.half==="top"?"表":"裏"}）${_sw.note?" ／ 守備: "+_sw.note:""}`,
         logType:"sub", runs:0
       },...(g.log||[]).slice(0,99)];
-      return {...g,[defTeam+"PitcherIdx"]:newPitcherIdx,[logKey]:newLog,log};
+      return {..._sw.g,[defTeam+"PitcherIdx"]:newPitcherIdx,[logKey]:newLog,log};
     });
+    // トースト用に最新状態で玉突きの有無を先読み（表示のみ・データは上のmutGameで確定）
+    const _gPrev = _gameRef.current || game;
+    const _pPrev = ((_gPrev[defTeam+"Pitchers"]||[])[newPitcherIdx]||{}).name;
+    const _swPrev = _pPrev ? applyPitcherPosSwap(_gPrev, defTeam, _pPrev) : {note:null};
+    if(_swPrev.note) setTimeout(()=>showToast("🔄 "+_swPrev.note), 900);
   },[mutGame]);
 
   
@@ -4444,7 +4512,7 @@ function App() {
             ))
         )
         )
-        , React.createElement('div',{onClick:function(){var pw=window.prompt("");if(pw!==DEV_PASS)return;var r=OWAPRO_SELF_TEST();var realFail=r.filter(function(x){return !x.pass&&!x.knownBugId;});var known=r.filter(function(x){return !x.pass&&x.knownBugId;});var fixed=r.filter(function(x){return x.pass&&x.knownBugId;});var msg="🧪 自己診断 "+r.length+"件\n";msg+=realFail.length===0?"✅ 想定外の不合格なし\n":"❌ 想定外の不合格 "+realFail.length+"件\n"+realFail.map(function(x){return "・"+x.name+"("+x.detail+")";}).join("\n")+"\n";if(known.length>0)msg+="⚠️ 既知未修正 "+known.length+"件\n"+known.map(function(x){return "・"+x.name;}).join("\n")+"\n";if(fixed.length>0)msg+="🎉 既知バグが直っています！knownBugIdを外してテストを確定してください: "+fixed.map(function(x){return x.name;}).join(",");alert(msg);},style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.48")
+        , React.createElement('div',{onClick:function(){var pw=window.prompt("");if(pw!==DEV_PASS)return;var r=OWAPRO_SELF_TEST();var realFail=r.filter(function(x){return !x.pass&&!x.knownBugId;});var known=r.filter(function(x){return !x.pass&&x.knownBugId;});var fixed=r.filter(function(x){return x.pass&&x.knownBugId;});var msg="🧪 自己診断 "+r.length+"件\n";msg+=realFail.length===0?"✅ 想定外の不合格なし\n":"❌ 想定外の不合格 "+realFail.length+"件\n"+realFail.map(function(x){return "・"+x.name+"("+x.detail+")";}).join("\n")+"\n";if(known.length>0)msg+="⚠️ 既知未修正 "+known.length+"件\n"+known.map(function(x){return "・"+x.name;}).join("\n")+"\n";if(fixed.length>0)msg+="🎉 既知バグが直っています！knownBugIdを外してテストを確定してください: "+fixed.map(function(x){return x.name;}).join(",");alert(msg);},style:{flexShrink:0,alignSelf:"center",fontSize:9,color:"#f97316",fontWeight:700,padding:"0 4px",whiteSpace:"nowrap"}}, "v473.49")
         
       )
 
@@ -4527,7 +4595,7 @@ function App() {
               "本サービスはご利用の方々の自己責任のもとでお使いください。"
             )
           )
-          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.48")
+          , React.createElement('div', {style:{fontSize:11,color:"#f97316",fontWeight:700}}, "v473.49")
         )
 
         // ===== 新規チーム作成 =====
@@ -4775,7 +4843,8 @@ function App() {
                     "試合開始時、未設定側に同じチームが自動セットされるバグを修正",
                     "投手の失点を「走者を出した投手」に正しく計上（継投時の帰属を修正）・暴投等の失点漏れも修正",
                     "守備位置の選択肢が画面外に出る問題・守備位置変更履歴の表示を修正",
-                    "暴投・ボーク等の得点で「誰の自責点ですか？」が出ない問題を修正・玉突きで動いた選手の守備履歴も表示"
+                    "暴投・ボーク等の得点で「誰の自責点ですか？」が出ない問題を修正・玉突きで動いた選手の守備履歴も表示",
+                    "出場中の野手が登板したとき、元の投手と守備位置を自動で入れ替えるように"
                   ]},
                   {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
                   {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
@@ -6191,7 +6260,8 @@ function App() {
                     "試合開始時、未設定側に同じチームが自動セットされるバグを修正",
                     "投手の失点を「走者を出した投手」に正しく計上（継投時の帰属を修正）・暴投等の失点漏れも修正",
                     "守備位置の選択肢が画面外に出る問題・守備位置変更履歴の表示を修正",
-                    "暴投・ボーク等の得点で「誰の自責点ですか？」が出ない問題を修正・玉突きで動いた選手の守備履歴も表示"
+                    "暴投・ボーク等の得点で「誰の自責点ですか？」が出ない問題を修正・玉突きで動いた選手の守備履歴も表示",
+                    "出場中の野手が登板したとき、元の投手と守備位置を自動で入れ替えるように"
                   ]},
                   {ver:"v472",date:"2026/06/01",items:["タイブレーク機能・代走・選手交代・undoなど多数追加"]},
                   {ver:"v471",date:"2026/05/01",items:["速報・投手成績・シェア機能など追加"]},
@@ -7767,14 +7837,18 @@ function App() {
                             fromHalf:_pitchHalf,
                             outsAtStart:_sameHalf?g.outs:0,
                             atBatSeq:_seqUI};
+                          // v473.49: 出場中の野手が登板する場合は守備位置を自動で玉突き
+                          const _swN = applyPitcherPosSwap(g, pcTeam, name.trim());
                           const newGameLog=[{
                             ts:new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
-                            msg:`【${g[pcTeam+"Team"]}】投手交代: ${name.trim()} 登板（${g.inning}回${g.half==="top"?"表":"裏"}）`,
+                            msg:`【${g[pcTeam+"Team"]}】投手交代: ${name.trim()} 登板（${g.inning}回${g.half==="top"?"表":"裏"}）${_swN.note?" ／ 守備: "+_swN.note:""}`,
                             logType:"sub", runs:0
                           },...(g.log||[]).slice(0,99)];
-                          return {...g,[pcTeam+"Pitchers"]:ps,[pcTeam+"PitcherIdx"]:newIdx,[logKey]:[...(g[logKey]||[]),entry],log:newGameLog};
+                          return {..._swN.g,[pcTeam+"Pitchers"]:ps,[pcTeam+"PitcherIdx"]:newIdx,[logKey]:[...(g[logKey]||[]),entry],log:newGameLog};
                         });
-                        setModal(null); showToast(name.trim()+" 登板");
+                        setModal(null);
+                        const _swNPrev = applyPitcherPosSwap(game, pcTeam, name.trim());
+                        showToast(name.trim()+" 登板"+(_swNPrev.note?"（"+_swNPrev.note+"）":""));
                       }
                     })
                 )
